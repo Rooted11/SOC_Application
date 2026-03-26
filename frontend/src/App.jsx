@@ -403,7 +403,7 @@ export default function App() {
 
               <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.25em] text-slate-400">
                 <div className="rounded-full border border-slate-800 bg-slate-900/70 px-4 py-2">
-                  Auto refresh 15s (visible tab)
+                  Auto refresh 15s (visible tab) · Hard reload every 10m
                 </div>
                 <div className="rounded-full border border-slate-800 bg-slate-900/70 px-4 py-2">
                   {authEnabled
