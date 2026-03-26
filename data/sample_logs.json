@@ -1,0 +1,114 @@
+{
+  "logs": [
+    {
+      "source": "auth",
+      "timestamp": "2026-03-23T02:14:33Z",
+      "log_level": "warning",
+      "message": "Failed authentication attempt from 185.220.101.55",
+      "ip_src": "185.220.101.55",
+      "ip_dst": "10.0.1.5",
+      "user": "admin",
+      "event_type": "auth_failure",
+      "raw_data": { "dst_port": 22, "attempts": 47 }
+    },
+    {
+      "source": "auth",
+      "timestamp": "2026-03-23T02:18:05Z",
+      "log_level": "warning",
+      "message": "Failed authentication attempt from 185.220.101.55",
+      "ip_src": "185.220.101.55",
+      "ip_dst": "10.0.1.5",
+      "user": "admin",
+      "event_type": "auth_failure",
+      "raw_data": { "dst_port": 22, "attempts": 48 }
+    },
+    {
+      "source": "auth",
+      "timestamp": "2026-03-23T02:18:10Z",
+      "log_level": "warning",
+      "message": "Failed authentication attempt from 185.220.101.55",
+      "ip_src": "185.220.101.55",
+      "ip_dst": "10.0.1.5",
+      "user": "root",
+      "event_type": "auth_failure",
+      "raw_data": { "dst_port": 22, "attempts": 49 }
+    },
+    {
+      "source": "endpoint",
+      "timestamp": "2026-03-23T03:45:22Z",
+      "log_level": "critical",
+      "message": "Malware signature detected: Ransom.WannaCry.B on workstation-42",
+      "ip_src": "10.0.2.42",
+      "ip_dst": "10.0.1.20",
+      "user": "jsmith",
+      "event_type": "malware_detected",
+      "raw_data": { "file": "C:\\Users\\jsmith\\Downloads\\invoice.exe", "hash": "d41d8cd98f00b204e9800998ecf8427e", "dst_port": 445 }
+    },
+    {
+      "source": "firewall",
+      "timestamp": "2026-03-23T04:02:11Z",
+      "log_level": "error",
+      "message": "Outbound connection to known C2 server blocked",
+      "ip_src": "10.0.2.42",
+      "ip_dst": "198.51.100.200",
+      "user": "SYSTEM",
+      "event_type": "c2_beacon",
+      "raw_data": { "dst_port": 443, "bytes_out": 2048, "domain": "evil-c2.xyz" }
+    },
+    {
+      "source": "syslog",
+      "timestamp": "2026-03-23T09:15:00Z",
+      "log_level": "info",
+      "message": "User login: jdoe authenticated successfully",
+      "ip_src": "10.0.2.10",
+      "ip_dst": "10.0.1.5",
+      "user": "jdoe",
+      "event_type": "auth_success",
+      "raw_data": { "dst_port": 389 }
+    },
+    {
+      "source": "syslog",
+      "timestamp": "2026-03-23T10:30:00Z",
+      "log_level": "info",
+      "message": "File accessed: /etc/passwd by process 'cat'",
+      "ip_src": "10.0.1.10",
+      "ip_dst": "10.0.1.10",
+      "user": "www-data",
+      "event_type": "file_access",
+      "raw_data": { "file": "/etc/passwd", "process": "cat", "pid": 4421 }
+    },
+    {
+      "source": "auth",
+      "timestamp": "2026-03-23T23:58:00Z",
+      "log_level": "error",
+      "message": "Privilege escalation detected: svc_backup ran sudo su -",
+      "ip_src": "10.0.1.30",
+      "ip_dst": "10.0.1.30",
+      "user": "svc_backup",
+      "event_type": "privilege_escalation",
+      "raw_data": { "command": "sudo su -", "dst_port": 0 }
+    },
+    {
+      "source": "firewall",
+      "timestamp": "2026-03-23T11:22:44Z",
+      "log_level": "warning",
+      "message": "Network scan detected from 203.0.113.88",
+      "ip_src": "203.0.113.88",
+      "ip_dst": "10.0.1.0",
+      "user": "",
+      "event_type": "network_scan",
+      "raw_data": { "dst_port": 0, "packets": 512, "scan_type": "SYN" }
+    },
+    {
+      "source": "endpoint",
+      "timestamp": "2026-03-23T14:05:30Z",
+      "log_level": "warning",
+      "message": "Lateral movement: RDP connection from Finance to Engineering subnet",
+      "ip_src": "10.0.2.42",
+      "ip_dst": "10.0.1.20",
+      "user": "jsmith",
+      "event_type": "lateral_movement",
+      "raw_data": { "dst_port": 3389, "protocol": "RDP" }
+    }
+  ]
+}

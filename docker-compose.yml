@@ -1,0 +1,95 @@
+services:
+
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     soc
+      POSTGRES_PASSWORD: soc_pass
+      POSTGRES_DB:       soc_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U soc -d soc_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── FastAPI backend ───────────────────────────────────────────────────────
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: development
+      USE_REDIS_STREAMS: "true"
+      REDIS_URL: redis://redis:6379/0
+      AUTH_ENABLED: "true"
+      AUTH_USERNAME: ${AUTH_USERNAME:-demo}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-demo123}
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:-demo-secret-key-change-me}
+      CORS_ORIGINS: http://localhost:3000
+      ALLOWED_HOSTS: localhost,127.0.0.1,testserver,backend
+      DATABASE_URL: postgresql://soc:soc_pass@db:5432/soc_db
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LOG_RETENTION_MINUTES: ${LOG_RETENTION_MINUTES:-5}
+    volumes:
+      - ./backend:/backend          # hot-reload in dev
+      - ./data:/data                # threat feed + sample data
+      - ./scripts:/scripts          # seed / simulation scripts
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── React frontend (dev server) ───────────────────────────────────────────
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      BACKEND_URL: "http://backend:8000"        # vite proxy target inside Docker
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    environment:
+      ENVIRONMENT: development
+      USE_REDIS_STREAMS: "true"
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql://soc:soc_pass@db:5432/soc_db
+      AUTH_ENABLED: "true"
+      AUTH_USERNAME: ${AUTH_USERNAME:-demo}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-demo123}
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:-demo-secret-key-change-me}
+      CORS_ORIGINS: http://localhost:3000
+      ALLOWED_HOSTS: localhost,127.0.0.1,testserver,backend
+      LOG_RETENTION_MINUTES: ${LOG_RETENTION_MINUTES:-5}
+    volumes:
+      - ./backend:/backend
+      - ./data:/data
+    depends_on:
+      - backend
+      - redis
+
+volumes:
+  postgres_data:
+  redis_data:

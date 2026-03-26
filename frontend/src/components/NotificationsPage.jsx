@@ -1,0 +1,142 @@
+import { useEffect, useState } from "react";
+import { api } from "../services/api";
+
+export default function NotificationsPage({ showAlert }) {
+  const [channels, setChannels] = useState([]);
+  const [form, setForm] = useState({
+    name: "",
+    channel: "email",
+  });
+  const [showForm, setShowForm] = useState(true);
+  const [showList, setShowList] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  async function refresh() {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.getNotificationChannels();
+      setChannels(data);
+    } catch (err) {
+      setError(err.message);
+      showAlert?.(err.message, "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  async function handleCreate(e) {
+    e.preventDefault();
+    try {
+      await api.createNotificationChannel({
+        name: form.name,
+        channel: form.channel,
+        enabled: true,
+        config: {},
+      });
+      setForm({ name: "", channel: "email" });
+      showAlert?.("Notification channel created", "success");
+      refresh();
+    } catch (err) {
+      showAlert?.(err.message, "error");
+    }
+  }
+
+  async function toggle(ch) {
+    try {
+      await api.updateNotificationChannel(ch.id, { enabled: !ch.enabled });
+      refresh();
+    } catch (err) {
+      showAlert?.(err.message, "error");
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-white">Notification Channels</h2>
+        <div className="flex gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => setShowForm((v) => !v)}
+            className="rounded-full border border-slate-700 px-3 py-1 text-slate-200 hover:border-cyan-400"
+          >
+            {showForm ? "Hide Form" : "Show Form"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowList((v) => !v)}
+            className="rounded-full border border-slate-700 px-3 py-1 text-slate-200 hover:border-cyan-400"
+          >
+            {showList ? "Hide List" : "Show List"}
+          </button>
+        </div>
+      </div>
+      {showForm && (
+      <form onSubmit={handleCreate} className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 flex flex-col gap-3">
+        <div className="text-sm text-slate-300 font-semibold">Add Channel</div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <input
+            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+            placeholder="Name"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            required
+          />
+          <select
+            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+            value={form.channel}
+            onChange={(e) => setForm({ ...form, channel: e.target.value })}
+          >
+            <option value="email">Email</option>
+            <option value="slack">Slack</option>
+            <option value="webhook">Webhook</option>
+          </select>
+        </div>
+        <button
+          type="submit"
+          className="self-start rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
+        >
+          Create Channel
+        </button>
+      </form>
+      )}
+      {showList && (
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+        {loading ? (
+          <div className="text-slate-400 text-sm">Loading…</div>
+        ) : error ? (
+          <div className="text-rose-300 text-sm">{error}</div>
+        ) : (
+          <div className="grid gap-3">
+            {channels.map((c) => (
+              <div key={c.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 flex items-center justify-between">
+                <div>
+                  <div className="text-white font-semibold">{c.name}</div>
+                  <div className="text-xs text-slate-500">{c.channel}</div>
+                </div>
+                <button
+                  onClick={() => toggle(c)}
+                  className={`rounded-full px-3 py-1 text-[11px] border ${
+                    c.enabled
+                      ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-100"
+                      : "border-slate-700 bg-slate-800 text-slate-300"
+                  }`}
+                >
+                  {c.enabled ? "Enabled" : "Disabled"}
+                </button>
+              </div>
+            ))}
+            {channels.length === 0 && <div className="text-slate-400 text-sm">No channels configured.</div>}
+          </div>
+        )}
+      </div>
+      )}
+    </div>
+  );
+}
