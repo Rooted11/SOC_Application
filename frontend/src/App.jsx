@@ -118,7 +118,7 @@ export default function App() {
     const timer = setInterval(tick, 15_000);
     const reloadTimer = setTimeout(() => {
       window.location.reload();
-    }, 30 * 60 * 1000); // 30 minutes
+    }, 10 * 60 * 1000); // 10 minutes
     document.addEventListener("visibilitychange", tick);
     return () => {
       clearInterval(timer);
