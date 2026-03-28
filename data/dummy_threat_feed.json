@@ -1,0 +1,126 @@
+{
+  "feed_name": "Ataraxia Threat Feed v1.0",
+  "generated": "2026-03-23T00:00:00Z",
+  "indicators": [
+    {
+      "ioc_type": "ip",
+      "value": "185.220.101.55",
+      "threat_type": "c2",
+      "severity": "critical",
+      "confidence": 0.97,
+      "feed_source": "threat_feed_alpha",
+      "description": "Tor exit node used as C2 relay by multiple APT groups",
+      "tags": ["tor", "c2", "apt"]
+    },
+    {
+      "ioc_type": "ip",
+      "value": "198.51.100.200",
+      "threat_type": "c2",
+      "severity": "critical",
+      "confidence": 0.95,
+      "feed_source": "misp_feed",
+      "description": "Known C2 server for Emotet botnet variant",
+      "tags": ["emotet", "botnet", "c2"]
+    },
+    {
+      "ioc_type": "ip",
+      "value": "203.0.113.88",
+      "threat_type": "apt",
+      "severity": "high",
+      "confidence": 0.88,
+      "feed_source": "isac_feed",
+      "description": "IP associated with APT29 (Cozy Bear) scanning infrastructure",
+      "tags": ["apt29", "cozy-bear", "scanning"]
+    },
+    {
+      "ioc_type": "domain",
+      "value": "evil-c2.xyz",
+      "threat_type": "c2",
+      "severity": "critical",
+      "confidence": 0.99,
+      "feed_source": "threat_feed_beta",
+      "description": "Active C2 domain for ransomware campaign — block immediately",
+      "tags": ["ransomware", "c2", "active"]
+    },
+    {
+      "ioc_type": "domain",
+      "value": "malicious-update.ru",
+      "threat_type": "malware",
+      "severity": "high",
+      "confidence": 0.91,
+      "feed_source": "threat_feed_beta",
+      "description": "Fake software update domain distributing trojanised installers",
+      "tags": ["trojan", "supply-chain"]
+    },
+    {
+      "ioc_type": "hash",
+      "value": "d41d8cd98f00b204e9800998ecf8427e",
+      "threat_type": "ransomware",
+      "severity": "critical",
+      "confidence": 0.99,
+      "feed_source": "threat_feed_alpha",
+      "description": "MD5 hash of WannaCry ransomware variant B dropper",
+      "tags": ["wannacry", "ransomware", "worm"]
+    },
+    {
+      "ioc_type": "hash",
+      "value": "44d88612fea8a8f36de82e1278abb02f",
+      "threat_type": "malware",
+      "severity": "high",
+      "confidence": 0.87,
+      "feed_source": "misp_feed",
+      "description": "Cobalt Strike beacon shellcode loader",
+      "tags": ["cobalt-strike", "beacon", "red-team"]
+    },
+    {
+      "ioc_type": "url",
+      "value": "http://phishing-corp-login.tk/auth",
+      "threat_type": "phishing",
+      "severity": "high",
+      "confidence": 0.93,
+      "feed_source": "threat_feed_gamma",
+      "description": "Phishing page mimicking corporate SSO portal",
+      "tags": ["phishing", "credential-harvesting", "sso"]
+    },
+    {
+      "ioc_type": "email",
+      "value": "noreply@malicious-update.ru",
+      "threat_type": "phishing",
+      "severity": "medium",
+      "confidence": 0.82,
+      "feed_source": "isac_feed",
+      "description": "Sender of spear-phishing emails targeting finance departments",
+      "tags": ["phishing", "spear-phishing", "finance"]
+    },
+    {
+      "ioc_type": "ip",
+      "value": "91.108.4.200",
+      "threat_type": "apt",
+      "severity": "critical",
+      "confidence": 0.96,
+      "feed_source": "misp_feed",
+      "description": "Infrastructure linked to Lazarus Group (DPRK) operations",
+      "tags": ["lazarus", "apt38", "dprk"]
+    },
+    {
+      "ioc_type": "domain",
+      "value": "update-win32-patch.cn",
+      "threat_type": "malware",
+      "severity": "high",
+      "confidence": 0.89,
+      "feed_source": "threat_feed_alpha",
+      "description": "Domain used for malware distribution via fake Windows updates",
+      "tags": ["malware-distribution", "fake-update"]
+    },
+    {
+      "ioc_type": "ip",
+      "value": "45.142.212.100",
+      "threat_type": "malware",
+      "severity": "high",
+      "confidence": 0.84,
+      "feed_source": "threat_feed_alpha",
+      "description": "Hosting server for multiple malware families — bulletproof hosting",
+      "tags": ["bulletproof-hosting", "malware"]
+    }
+  ]
+}
