@@ -64,7 +64,8 @@ function formatDate(ts) {
 }
 
 // --- Detail Panel (right side when a log is selected) ---
-function LogDetail({ log, onClose, setPage }) {
+function LogDetail({ log, onClose, onDelete, setPage }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   if (!log) return null;
 
   const fields = [
@@ -190,6 +191,35 @@ function LogDetail({ log, onClose, setPage }) {
             </pre>
           </div>
         )}
+
+        {/* Delete button */}
+        {onDelete && (
+          <div className="pt-2 border-t border-gray-800">
+            {!confirmDelete ? (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="w-full text-xs px-3 py-2 rounded border border-red-900/50 text-red-500 hover:bg-red-950/30 hover:border-red-700 transition-colors"
+              >
+                Delete This Log
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onDelete(log.id)}
+                  className="flex-1 text-xs px-3 py-2 rounded bg-red-700 hover:bg-red-600 text-white font-semibold"
+                >
+                  Confirm Delete
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="text-xs px-3 py-2 rounded border border-gray-700 text-gray-400 hover:text-gray-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -249,8 +279,47 @@ export default function LiveFeed({ lastUpdated, showAlert, setPage }) {
   const [eventFilter,    setEventFilter]    = useState("");
   const [selectedLog,    setSelectedLog]    = useState(null);
   const [assets,         setAssets]         = useState([]);
+  const [confirmAction,  setConfirmAction]  = useState(null); // "clear" | "archive" | null
   const prevIds     = useRef(new Set());
   const intervalRef = useRef(null);
+
+  const handleClearAll = async () => {
+    try {
+      const result = await api.deleteLogsBulk({ all: true });
+      showAlert(`Cleared ${result.deleted_logs} logs, ${result.deleted_incidents} incidents`, "success");
+      setSelectedLog(null);
+      setConfirmAction(null);
+      fetchLogs();
+    } catch (e) {
+      showAlert(e.message, "error");
+    }
+  };
+
+  const handleArchive = async () => {
+    try {
+      const result = await api.archiveLogs();
+      if (result.archived === 0) {
+        showAlert(result.message || "No logs old enough to archive", "info");
+      } else {
+        showAlert(`Archived ${result.archived} logs and purged from DB`, "success");
+      }
+      setConfirmAction(null);
+      fetchLogs();
+    } catch (e) {
+      showAlert(e.message, "error");
+    }
+  };
+
+  const handleDeleteLog = async (logId) => {
+    try {
+      const result = await api.deleteLog(logId);
+      showAlert(`Deleted log #${logId}` + (result.deleted_incidents ? ` and ${result.deleted_incidents} linked incident(s)` : ""), "success");
+      setSelectedLog(null);
+      fetchLogs();
+    } catch (e) {
+      showAlert(e.message, "error");
+    }
+  };
 
   // Fetch assets once on mount
   useEffect(() => {
@@ -327,6 +396,28 @@ export default function LiveFeed({ lastUpdated, showAlert, setPage }) {
             Refresh
           </button>
 
+          <button
+            onClick={() => setConfirmAction(confirmAction === "archive" ? null : "archive")}
+            className={`text-xs px-3 py-1.5 rounded border transition-colors ${
+              confirmAction === "archive"
+                ? "bg-yellow-900/40 border-yellow-700 text-yellow-400"
+                : "bg-gray-800 border-gray-700 text-gray-400 hover:border-yellow-700 hover:text-yellow-400"
+            }`}
+          >
+            Archive & Purge
+          </button>
+
+          <button
+            onClick={() => setConfirmAction(confirmAction === "clear" ? null : "clear")}
+            className={`text-xs px-3 py-1.5 rounded border transition-colors ${
+              confirmAction === "clear"
+                ? "bg-red-900/40 border-red-700 text-red-400"
+                : "bg-gray-800 border-gray-700 text-gray-400 hover:border-red-700 hover:text-red-400"
+            }`}
+          >
+            Clear All
+          </button>
+
           <div className="flex items-center gap-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-400">
             <input
               value={sourceFilter}
@@ -350,6 +441,37 @@ export default function LiveFeed({ lastUpdated, showAlert, setPage }) {
             </span>
           )}
         </div>
+
+        {/* ── Confirm banner ───────────────────────────────────────────── */}
+        {confirmAction && (
+          <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-xs ${
+            confirmAction === "clear"
+              ? "bg-red-950/30 border-red-800 text-red-400"
+              : "bg-yellow-950/30 border-yellow-800 text-yellow-400"
+          }`}>
+            <span className="font-medium">
+              {confirmAction === "clear"
+                ? `Delete ALL ${total.toLocaleString()} logs and linked incidents? This cannot be undone.`
+                : "Archive logs older than retention period to gzip, then purge from database?"}
+            </span>
+            <button
+              onClick={confirmAction === "clear" ? handleClearAll : handleArchive}
+              className={`px-3 py-1 rounded font-semibold ${
+                confirmAction === "clear"
+                  ? "bg-red-700 hover:bg-red-600 text-white"
+                  : "bg-yellow-700 hover:bg-yellow-600 text-white"
+              }`}
+            >
+              Confirm
+            </button>
+            <button
+              onClick={() => setConfirmAction(null)}
+              className="text-gray-500 hover:text-gray-300"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         {/* ── Event type filters ──────────────────────────────────────── */}
         <div className="flex gap-1 flex-wrap">
@@ -469,7 +591,7 @@ export default function LiveFeed({ lastUpdated, showAlert, setPage }) {
 
       {/* ── Detail panel ──────────────────────────────────────────────── */}
       {selectedLog && (
-        <LogDetail log={selectedLog} onClose={() => setSelectedLog(null)} setPage={setPage} />
+        <LogDetail log={selectedLog} onClose={() => setSelectedLog(null)} onDelete={handleDeleteLog} setPage={setPage} />
       )}
     </div>
   );

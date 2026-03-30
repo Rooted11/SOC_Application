@@ -9,6 +9,7 @@ GET  /api/logs/stats   — summary statistics
 from datetime import datetime
 from typing import List, Optional
 import hmac
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
@@ -16,7 +17,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..services.database import (
-    get_db, Log, Asset, Incident, SeverityEnum, StatusEnum
+    get_db, Log, Asset, Incident, Alert, PlaybookAction, SeverityEnum, StatusEnum
 )
 from ..services.anomaly_detection import detector
 from ..services.threat_intel import threat_intel
@@ -178,6 +179,135 @@ def analyze_logs(
         updated += 1
     db.commit()
     return {"re_scored": updated}
+
+
+# ── Delete / Archive ───────────────────────────────────────────────────────
+
+def _cascade_delete_logs(db: Session, log_ids: list[int]) -> dict:
+    """Delete logs and all FK-dependent rows (playbook_actions → alerts → incidents → logs)."""
+    if not log_ids:
+        return {"deleted_logs": 0, "deleted_incidents": 0, "deleted_alerts": 0, "deleted_actions": 0}
+
+    incident_ids = [
+        r[0] for r in db.query(Incident.id).filter(Incident.trigger_log_id.in_(log_ids)).all()
+    ]
+
+    deleted_actions = 0
+    deleted_alerts = 0
+    deleted_incidents = 0
+
+    if incident_ids:
+        deleted_actions = db.query(PlaybookAction).filter(
+            PlaybookAction.incident_id.in_(incident_ids)
+        ).delete(synchronize_session=False)
+
+        deleted_alerts = db.query(Alert).filter(
+            Alert.incident_id.in_(incident_ids)
+        ).delete(synchronize_session=False)
+
+        deleted_incidents = db.query(Incident).filter(
+            Incident.id.in_(incident_ids)
+        ).delete(synchronize_session=False)
+
+    deleted_logs = db.query(Log).filter(Log.id.in_(log_ids)).delete(synchronize_session=False)
+    db.commit()
+
+    return {
+        "deleted_logs": deleted_logs,
+        "deleted_incidents": deleted_incidents,
+        "deleted_alerts": deleted_alerts,
+        "deleted_actions": deleted_actions,
+    }
+
+
+@router.delete("/{log_id}")
+def delete_log(
+    log_id: int,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete a single log and its linked incident chain."""
+    log = db.query(Log).filter(Log.id == log_id).first()
+    if not log:
+        raise HTTPException(status_code=404, detail="Log not found")
+    result = _cascade_delete_logs(db, [log_id])
+    logger.info("User %s deleted log #%d", user.username, log_id)
+    return result
+
+
+class BulkDeleteRequest(BaseModel):
+    source: Optional[str] = None
+    before: Optional[datetime] = None
+    all: Optional[bool] = False
+
+
+@router.delete("")
+def delete_logs_bulk(
+    payload: BulkDeleteRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Bulk delete logs by source, date, or all."""
+    q = db.query(Log.id)
+    if not payload.all:
+        if not payload.source and not payload.before:
+            raise HTTPException(status_code=400, detail="Specify source, before, or all=true")
+        if payload.source:
+            q = q.filter(Log.source == payload.source)
+        if payload.before:
+            q = q.filter(Log.timestamp < payload.before)
+    log_ids = [r[0] for r in q.all()]
+    result = _cascade_delete_logs(db, log_ids)
+    logger.info("User %s bulk-deleted %d logs (source=%s, before=%s, all=%s)",
+                user.username, result["deleted_logs"], payload.source, payload.before, payload.all)
+    return result
+
+
+@router.post("/archive")
+def archive_and_purge(
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Trigger archive_logs.py logic: archive old logs to gzip, then delete from DB."""
+    import gzip, json
+    from pathlib import Path
+    from datetime import timezone, timedelta
+
+    retain_hours = float(os.getenv("LOG_RETAIN_HOURS", "0.25"))
+    archive_dir = Path(os.getenv("ARCHIVE_DIR", "/opt/soc-lab/logs/archive"))
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=retain_hours)
+    rows = db.query(Log).filter(Log.timestamp < cutoff).order_by(Log.timestamp.asc()).all()
+
+    if not rows:
+        return {"archived": 0, "message": f"No logs older than {retain_hours}h to archive."}
+
+    by_date = {}
+    for row in rows:
+        d = row.timestamp.strftime("%Y-%m-%d") if row.timestamp else "unknown"
+        by_date.setdefault(d, []).append(_log_to_dict(row))
+
+    archived_count = 0
+    for date_str, log_list in by_date.items():
+        archive_path = archive_dir / f"{date_str}.json.gz"
+        existing = []
+        if archive_path.exists():
+            with gzip.open(archive_path, "rt") as f:
+                existing = json.load(f)
+        combined = existing + log_list
+        with gzip.open(archive_path, "wt") as f:
+            json.dump(combined, f, default=str)
+        archived_count += len(log_list)
+
+    log_ids = [row.id for row in rows]
+    result = _cascade_delete_logs(db, log_ids)
+    logger.info("User %s archived %d logs and purged from DB", user.username, archived_count)
+    return {
+        "archived": archived_count,
+        "purged": result,
+        "retain_hours": retain_hours,
+    }
 
 
 # ── Serialiser ──────────────────────────────────────────────────────────────

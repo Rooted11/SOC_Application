@@ -141,6 +141,18 @@ export const api = {
       body: JSON.stringify({ logs }),
     }),
 
+  deleteLog: (id) =>
+    request(`/api/logs/${id}`, { method: "DELETE" }),
+
+  deleteLogsBulk: (params = {}) =>
+    request("/api/logs", {
+      method: "DELETE",
+      body: JSON.stringify(params),
+    }),
+
+  archiveLogs: () =>
+    request("/api/logs/archive", { method: "POST" }),
+
   getThreatIntel: (params = {}) => {
     const qs = new URLSearchParams(
       Object.fromEntries(Object.entries(params).filter(([, value]) => value != null))
