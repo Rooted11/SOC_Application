@@ -2,7 +2,6 @@
 FastAPI application entry point for the AI-Powered SOC backend.
 """
 
-import logging
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
@@ -14,7 +13,7 @@ from app.routes.auth import router as auth_router
 from app.services.config import settings, validate_settings
 from app.services.database import init_db
 from app.services.rate_limit import api_rate_limiter
-from app.services.security import get_current_user, get_request_client_ip
+from app.services.security import get_current_user, get_agent_or_user, get_request_client_ip
 from app.services.threat_intel import threat_intel
 from app.services.database import SessionLocal
 from app.routes.logs import router as logs_router
@@ -32,11 +31,9 @@ from app.routes.system import router as system_router
 from app.routes.audit import router as audit_router
 from app.routes.alarms import router as alarms_router
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
-logger = logging.getLogger(__name__)
+from app.logging_config import get_logger
+
+logger = get_logger(__name__)
 _UNLIMITED_PATHS = {"/api/auth/status", "/api/auth/login", "/health", "/"}
 
 validate_settings()
@@ -48,13 +45,14 @@ async def lifespan(app: FastAPI):
     logger.info("Initialising database tables and seed data...")
     init_db()
 
-    logger.info("Loading threat intelligence feeds...")
-    db = SessionLocal()
-    try:
-        threat_intel.load_from_file(db)
-        threat_intel.fetch_live_feed(db)
-    finally:
-        db.close()
+    if settings.seed_demo_data:
+        logger.info("Loading threat intelligence feeds...")
+        db = SessionLocal()
+        try:
+            threat_intel.load_from_file(db)
+            threat_intel.fetch_live_feed(db)
+        finally:
+            db.close()
 
     logger.info("Ataraxia backend ready.")
     yield
@@ -122,7 +120,7 @@ async def add_security_headers(request, call_next):
 
 
 app.include_router(auth_router)
-app.include_router(logs_router, dependencies=[Depends(get_current_user)])
+app.include_router(logs_router)
 app.include_router(incidents_router, dependencies=[Depends(get_current_user)])
 app.include_router(ai_router, dependencies=[Depends(get_current_user)])
 app.include_router(events_router, dependencies=[Depends(get_current_user)])

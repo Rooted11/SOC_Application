@@ -17,7 +17,10 @@ from typing import List, Set
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.logging_config import get_logger
 from .config import settings
+
+logger = get_logger(__name__)
 from . import rbac
 
 
@@ -225,3 +228,51 @@ def get_current_user(
         permissions={"*"} if is_env_user else set(),
         is_super_admin=is_env_user,
     )
+
+
+def get_agent_or_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> AuthenticatedUser | None:
+    """
+    Allow either a normal authenticated user or a local ingest agent token.
+    The agent token is intended for lab/internal forwarders only.
+    """
+    agent_header = request.headers.get("x-agent-token")
+    bearer_token = credentials.credentials if credentials else None
+    client_ip    = get_request_client_ip(request)
+    if settings.ingest_token and agent_header:
+        if hmac.compare_digest(agent_header, settings.ingest_token):
+            return AuthenticatedUser(
+                username="ingest-agent",
+                mfa_authenticated=False,
+                roles=["ingest_agent"],
+                permissions={"logs:ingest"},
+                is_super_admin=False,
+            )
+        else:
+            logger.warning("Ingest agent token mismatch from request")
+    if settings.ingest_token and bearer_token and hmac.compare_digest(bearer_token, settings.ingest_token):
+        return AuthenticatedUser(
+            username="ingest-agent",
+            mfa_authenticated=False,
+            roles=["ingest_agent"],
+            permissions={"logs:ingest"},
+            is_super_admin=False,
+        )
+    # Lab-only fallback: allow local/host-only ingestion when token is configured
+    if settings.ingest_token and (
+        client_ip in {settings.primary_asset_ip, "127.0.0.1", "localhost"}
+        or client_ip.startswith("172.")
+    ):
+        return AuthenticatedUser(
+            username="ingest-agent",
+            mfa_authenticated=False,
+            roles=["ingest_agent"],
+            permissions={"logs:ingest"},
+            is_super_admin=False,
+        )
+    if credentials:
+        # Standard user auth path; may raise 401
+        return get_current_user(credentials)
+    return None

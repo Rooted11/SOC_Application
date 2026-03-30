@@ -16,10 +16,17 @@ import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from .config import settings
+
 logger = logging.getLogger(__name__)
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-MODEL = "claude-opus-4-6"
+MODEL = (
+    os.getenv("ANTHROPIC_MODEL")
+    or os.getenv("CLAUDE_MODEL")
+    or settings.ai_model
+    or "claude-3-haiku"
+)
 
 _client = None
 

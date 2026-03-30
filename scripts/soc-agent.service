@@ -1,0 +1,29 @@
+[Unit]
+Description=Ataraxia SOC Log Agent
+Documentation=https://github.com/your-org/ataraxia
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/soc-lab
+
+# Core settings — override in /etc/soc-agent.env
+EnvironmentFile=-/etc/soc-agent.env
+Environment="SOC_ENDPOINT=http://192.168.56.102:8000"
+Environment="SOC_TOKEN=lab-ingest-token"
+Environment="SOC_INTERVAL=10"
+Environment="SOC_BATCH=50"
+Environment="SOC_LOG_FILES=/var/log/auth.log,/var/log/syslog,/var/log/kern.log"
+Environment="SOC_STATE_FILE=/var/lib/soc-agent/state.json"
+
+ExecStartPre=/bin/mkdir -p /var/lib/soc-agent
+ExecStart=/usr/bin/python3 /opt/soc-lab/scripts/soc_agent.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=soc-agent
+
+[Install]
+WantedBy=multi-user.target

@@ -1,112 +1,419 @@
-# Ataraxia (AI-Powered SOC)
+# Ataraxia -- AI-Powered Security Operations Center
 
-Ataraxia is a full-stack SOC prototype with FastAPI + PostgreSQL on the backend, React + Vite on the frontend, AI-assisted investigation, automated playbooks, threat intel correlation, optional TOTP MFA, and in-memory rate limiting. It ships with both a local dev stack and a hardened production stack fronted by an HTTPS reverse proxy.
+A full-stack SOC platform with ML anomaly detection, automated incident response,
+threat intelligence correlation, and AI-assisted investigation. Built for lab
+environments, presentations, and security research.
 
-## Features
-- AI/ML anomaly detection over log streams with incident auto-creation
-- Automated playbooks (isolate host, revoke credentials, block IP, send alert)
-- Threat intel ingestion and correlation across IP/domain/hash/user artifacts
-- Operator auth with bearer tokens, optional TOTP MFA, and login/API rate limiting
-- Hardened production stack: nginx frontend, backend and DB not publicly exposed, TLS-ready reverse proxy example
-- React Command Center with incidents, trends, threat intel, and AI advisor
+---
 
-## Stack
-- Backend: FastAPI, SQLAlchemy, PostgreSQL, Isolation Forest ML
-- Frontend: React, Vite, Tailwind, nginx (prod)
-- Infrastructure: Docker Compose (dev + prod), optional Caddy reverse proxy
+## Architecture
 
-## Endpoint Targeting (Windows vs Ubuntu vs Docker)
-- Windows host (VS/Vite, PowerShell scripts): call the backend at http://192.168.56.101:8000. The Vite dev server still runs at http://localhost:3000 on Windows.
-- Ubuntu VM itself: backend http://localhost:8000, frontend http://localhost:3000.
-- Inside Docker Compose: use service names (e.g., backend:8000, db:5432, redis:6379); avoid localhost or the VM IP for container-to-container calls.
+```
+  Windows Host (192.168.56.1)              Ubuntu VM (192.168.56.102)
+  ===========================              ==========================
+                                           Docker Compose
+  Browser ──────────────────────────────►  ┌──────────────────────┐
+  http://192.168.56.102:3000               │  frontend (Vite/React)│ :3000
+                                           │         │             │
+  soc_manage.py ────────────────────────►  │  backend (FastAPI)    │ :8000
+  send_local_logs.py ───────────────────►  │    ├── anomaly_detection (Isolation Forest ML)
+                                           │    ├── correlation_engine (multi-event patterns)
+                                           │    ├── detection_rules (custom rules)
+                                           │    ├── threat_intel (IOC correlation)
+                                           │    ├── playbook_executor (auto-response)
+                                           │    └── claude_service (AI analyst)
+                                           │         │             │
+                                           │  worker (Redis Stream) │
+                                           │    └── processes queued logs
+                                           │         │             │
+                                           │  redis (Streams)      │ :6379
+                                           │  db (PostgreSQL 16)   │ :5432
+                                           └──────────────────────┘
 
-## Dev Quickstart
-1. Prereqs: Docker Desktop, Git; Python 3.10+ optional for running scripts directly.
-2. Enter the project: `cd ai-soc`.
-3. Start the dev stack:  
-   ```
-   docker compose up --build
-   ```
-4. Seed sample data (from another terminal):  
-   ```
-   docker compose exec backend python /data/../scripts/init_db.py
-   ```
-   or locally:  
-   ```
-   python scripts/init_db.py
-   ```
-5. Open the UI: from Windows use http://192.168.56.101:3000 when the frontend runs in Docker on the VM; if you run `npm run dev` locally on Windows, it stays at http://localhost:3000.
-6. Simulate logs:  
-   ```
-   python scripts/simulate_logs.py --once --count 20
-   python scripts/simulate_logs.py --interval 2 --count 5
-   ```
-7. Refresh the threat feed:  
-   ```
-   # Windows host -> Ubuntu backend
-   python scripts/simulate_threat_feed.py --count 50 --push-url http://192.168.56.101:8000
-   # On the Ubuntu VM itself, keep localhost
-   # python scripts/simulate_threat_feed.py --count 50 --push-url http://localhost:8000
-   ```
-> Running the backend directly (outside Docker)? Start it on the Ubuntu VM with `uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload` so the Windows browser can reach it.
+                                           systemd services:
+                                             soc-agent  (tails /var/log/* -> backend)
+                                             cron       (archive logs every 10 min)
+```
 
-## Tests
-- Backend: `docker compose exec backend python -m unittest tests.test_api_smoke tests.test_security`
-- Frontend build: `docker compose exec frontend npm run build`
+## Detection Pipeline
 
-## Event-Driven Mode (Redis Streams)
-- Redis is bundled in both dev/prod compose files; the worker service consumes the log stream.
-- Dev defaults to synchronous processing; turn on streaming by setting `USE_REDIS_STREAMS=true` (and `REDIS_URL` if different) for the backend and worker.
-- In this repo, dev compose is now streaming-enabled by default; set `USE_REDIS_STREAMS=false` if you want the legacy inline path.
-- With streaming enabled, `/api/logs/ingest` queues to Redis and returns 202; the worker handles scoring, correlation, incident creation, and playbooks.
-- In prod compose, streaming is on by default.
+```
+  Log Ingested ──► Redis Stream ──► Worker picks up
+       │
+       ▼
+  1. ML Anomaly Scoring (Isolation Forest, 15-feature vector)
+       │     - Hour, weekday, source IP bucket, event type, fan-out,
+       │       auth failure count, external IP, lateral movement, etc.
+       │     - Risk score 0-100, anomalous if raw score < -0.05
+       │
+  2. Custom Detection Rules (operator-defined threshold/pattern rules)
+       │     - Can boost risk_score to 70+
+       │     - Suppression support (by IP, with expiry)
+       │
+  3. Event Correlation Engine (multi-log patterns)
+       │     - Brute Force -> Success (5+ failures + success, 10 min)
+       │     - Lateral Movement Chain (3+ distinct destinations, 15 min)
+       │     - Priv Esc After Login (auth + escalation, 5 min)
+       │     - Port Scan (10+ firewall events, 5 min)
+       │     - C2 Beaconing (3+ beacons, 30 min)
+       │     - Data Exfil After Compromise (auth + exfil, 60 min)
+       │
+  4. Threat Intel Correlation (IOC matching)
+       │     - IP, domain, hash, URL, email indicators
+       │     - Multiple feed sources, confidence scoring
+       │
+  5. Incident Creation (if anomalous OR rules match OR IOC hit)
+       │     - Severity: critical/high/medium/low/info
+       │     - AI recommendation (Claude Haiku or fallback template)
+       │     - 30-minute deduplication window
+       │
+  6. Automated Playbook Execution
+         - isolate_host, revoke_credentials, block_ip, collect_forensics
+         - send_alert (Slack, PagerDuty, email -- simulated)
+         - Auto-selects based on severity + event type
+```
 
-## Production Deployment (Hardened)
-1. Create a prod env file:  
-   ```
-   cp .env.production.example .env.production
-   ```  
-   Set strong values for `POSTGRES_PASSWORD`, `AUTH_PASSWORD`, `AUTH_TOKEN_SECRET`, `ALLOWED_HOSTS`, and `AUTH_TOTP_SECRET` if MFA is enabled.
-   Generate a TOTP secret if needed:  
-   ```
-   python scripts/generate_mfa_secret.py --account soc_operator --issuer "Ataraxia"
-   ```
-2. Start the production stack (frontend bound to localhost only):  
-   ```
-   docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
-   ```
-3. Put HTTPS in front: terminate TLS on the host and proxy to `127.0.0.1:${PUBLIC_PORT:-3000}`. An example Caddy config is in `deploy/Caddyfile.example` and can be run with `caddy run --config deploy/Caddyfile.example` after updating the hostname.
-4. Sign in at http://localhost:3000 using `AUTH_USERNAME` and `AUTH_PASSWORD`; if `AUTH_MFA_ENABLED=true`, enter the 6-digit TOTP code.
+## Quick Start (Ubuntu VM)
 
-## Security Defaults
-- Production enables bearer auth; dev keeps auth disabled.
-- Optional TOTP MFA; login payload accepts `otp_code`.
-- In-memory rate limiting by default (single-instance): `API_RATE_LIMIT_REQUESTS=300` per `API_RATE_LIMIT_WINDOW_SECONDS=60`; login limit `LOGIN_RATE_LIMIT_ATTEMPTS=5` per `LOGIN_RATE_LIMIT_WINDOW_SECONDS=300`.
-- API docs disabled in production (`ENABLE_API_DOCS=false`).
-- Backend and PostgreSQL are not published externally in prod; only nginx is exposed on localhost for a reverse proxy.
-- Frontend nginx sets CSP, Permissions-Policy, server_tokens off, and forwards `X-Forwarded-*` headers.
+### Prerequisites
+- Ubuntu 22.04+ VM with Docker and Docker Compose
+- VirtualBox Host-Only adapter (192.168.56.x network)
+- Python 3.10+
 
-## Config Cheatsheet (env vars)
-- `AUTH_ENABLED` toggles auth (default true in prod).
-- `AUTH_USERNAME` / `AUTH_PASSWORD` operator credentials.
-- `AUTH_TOKEN_SECRET` HMAC secret for JWTs.
-- `AUTH_TOKEN_TTL_MINUTES` token lifetime.
-- `AUTH_MFA_ENABLED` enable TOTP; `AUTH_TOTP_SECRET` base32 secret; `AUTH_TOTP_ISSUER` app label.
-- `RATE_LIMIT_ENABLED`, `API_RATE_LIMIT_REQUESTS`, `API_RATE_LIMIT_WINDOW_SECONDS`, `LOGIN_RATE_LIMIT_ATTEMPTS`, `LOGIN_RATE_LIMIT_WINDOW_SECONDS`.
-- `ALLOWED_HOSTS` comma list for host allowlist.
-- `ENABLE_API_DOCS` enable `/docs` (dev only recommended).
-- `DATABASE_URL` Postgres/SQLite DSN; `POSTGRES_PASSWORD` for the bundled DB.
-- `ANTHROPIC_API_KEY` optional; without it the AI advisor uses the fallback path.
+### 1. Clone and configure
 
-## Helpful Scripts
-- `scripts/init_db.py` seed sample data.
-- `scripts/simulate_logs.py` stream or batch logs.
-- `scripts/simulate_threat_feed.py` refresh IOCs.
-- `scripts/auth_client.py` CLI login helper (handles MFA when enabled).
-- `scripts/generate_mfa_secret.py` create a TOTP secret and otpauth URI.
+```bash
+cd /home/$USER/Lab-Repo
+cp .env.example .env
+# Edit .env: set ANTHROPIC_API_KEY if you want AI features
+```
+
+### 2. Start all services
+
+```bash
+docker-compose up -d
+# Verify: 5 containers running
+docker-compose ps
+```
+
+Services:
+| Service  | Port | Description |
+|----------|------|-------------|
+| frontend | 3000 | React dashboard |
+| backend  | 8000 | FastAPI API |
+| worker   | --   | Redis Stream log processor |
+| redis    | 6379 | Message queue |
+| db       | 5432 | PostgreSQL 16 |
+
+### 3. Start the Linux log agent
+
+```bash
+sudo systemctl start soc-agent
+sudo systemctl enable soc-agent
+# Check: sudo journalctl -u soc-agent -f
+```
+
+### 4. Login
+
+Open http://192.168.56.102:3000 in your browser.
+
+| Field    | Value |
+|----------|-------|
+| Username | soc_operator |
+| Password | change-me-locally |
+
+## Connecting from Windows
+
+### Frontend (browser)
+Navigate to: `http://192.168.56.102:3000`
+
+### API access (scripts)
+All scripts default to `http://192.168.56.102:8000`.
+
+### Management tool (no SSH required)
+```powershell
+cd "C:\path\to\Lab-Repo-main"
+
+python scripts/soc_manage.py status          # Full health dashboard
+python scripts/soc_manage.py incidents       # List incidents
+python scripts/soc_manage.py incidents --open
+python scripts/soc_manage.py logs            # Log statistics
+python scripts/soc_manage.py alarms          # View alarms
+python scripts/soc_manage.py playbooks       # List playbooks
+python scripts/soc_manage.py detections      # Detection rules
+python scripts/soc_manage.py services        # Docker status (via SSH)
+python scripts/soc_manage.py restart         # Restart containers (via SSH)
+python scripts/soc_manage.py seed            # Inject attack simulation
+python scripts/soc_manage.py resolve-all     # Resolve all open incidents
+```
+
+### Windows endpoint log sender
+```powershell
+# Send demo Windows logs
+python scripts/send_local_logs.py --demo --once
+
+# Continuous collection (requires pywin32 or falls back to wevtutil)
+python scripts/send_local_logs.py --interval 15
+
+# One-shot collection
+python scripts/send_local_logs.py --once
+```
+
+## Sending Logs
+
+### From Linux (soc-agent -- already running)
+The systemd agent tails `/var/log/auth.log`, `/var/log/syslog`, `/var/log/kern.log`
+and sends to the backend every 10 seconds.
+
+### From any machine (curl)
+```bash
+curl -X POST http://192.168.56.102:8000/api/logs/ingest \
+  -H "Content-Type: application/json" \
+  -H "X-Agent-Token: lab-ingest-token" \
+  -d '{
+    "logs": [{
+      "source": "test",
+      "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
+      "log_level": "error",
+      "message": "Failed password for root from 10.0.0.45 port 22 ssh2",
+      "ip_src": "10.0.0.45",
+      "event_type": "auth_failure",
+      "user": "root",
+      "raw_data": {"host": "test-host"}
+    }]
+  }'
+```
+
+### From Python
+```python
+import json, urllib.request
+url = "http://192.168.56.102:8000/api/logs/ingest"
+logs = [{"source":"test","timestamp":"2026-03-28T12:00:00Z",
+         "log_level":"error","message":"Test alert","ip_src":"10.0.0.1",
+         "event_type":"auth_failure","user":"admin"}]
+data = json.dumps({"logs": logs}).encode()
+req = urllib.request.Request(url, data=data, method="POST",
+    headers={"Content-Type":"application/json","X-Agent-Token":"lab-ingest-token"})
+with urllib.request.urlopen(req) as resp:
+    print(resp.read().decode())
+```
+
+## Simulating Attacks
+
+Run the setup script to inject realistic attack scenarios:
+
+```bash
+# On the VM
+python3 scripts/setup_soc.py
+
+# From Windows
+python scripts/soc_manage.py seed
+```
+
+This injects:
+- **SSH brute force** (15 failed logins from 10.0.0.45)
+- **Successful breach** (attacker gains root access)
+- **Privilege escalation** (sudo to root)
+- **Lateral movement** (SSH from compromised host to another)
+- **C2 beaconing** (outbound connections to known-bad IP)
+- **Data exfiltration** (2.3 GB transfer to external IP)
+- **Port scanning** (firewall blocks across subnet)
+- **Malware detection** (ClamAV trojan find)
+- **Sensitive file access** (/etc/shadow read)
+- **Account tampering** (backdoor user created with UID 0)
+
+Plus 20 normal baseline logs for ML contrast.
+
+## Key Configuration
+
+### Environment variables (.env on VM)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ANTHROPIC_API_KEY` | (none) | Enable AI analyst features |
+| `ANTHROPIC_MODEL` | claude-3-haiku-20240307 | AI model (haiku = cheapest) |
+| `AI_AUTO_ENABLED` | true | Auto-generate AI recommendations on incidents |
+| `AUTH_TOKEN_SECRET` | (set in .env) | HMAC secret for auth tokens |
+| `INGEST_TOKEN` | lab-ingest-token | Token for log ingestion API |
+| `USE_REDIS_STREAMS` | true | Async log processing via Redis |
+| `LOG_RETENTION_MINUTES` | 1440 | Auto-cleanup after 24h |
+| `RATE_LIMIT_ENABLED` | true | Enable API rate limiting |
+
+### AI Cost Management
+
+The AI analyst uses Claude Haiku by default (~60x cheaper than Opus).
+
+- **AI runs when**: a new incident is auto-created (not on every log)
+- **To save credits**: set `AI_AUTO_ENABLED=false` in `.env` -- the system
+  uses high-quality fallback templates instead
+- **Manual AI**: use the AI Advisor tab to query specific incidents on-demand
+- **Cost estimate**: ~$0.001 per incident recommendation with Haiku
+
+## Application Logging
+
+All backend services write structured logs to `backend/logs/`.
+
+### Log files
+
+| File | Content | Level |
+|------|---------|-------|
+| `backend/logs/app.log` | All application activity | INFO+ |
+| `backend/logs/error.log` | Errors only | ERROR+ |
+
+### Format
+
+```
+timestamp | level | source | message
+2026-03-29T03:41:17 | INFO     | app.main | Ataraxia backend ready.
+2026-03-29T03:41:28 | ERROR    | worker | Redis connection error: ...
+```
+
+### Viewing logs
+
+```bash
+# Live tail (from VM)
+tail -f backend/logs/app.log
+
+# Errors only
+tail -f backend/logs/error.log
+
+# Docker container output (also uses the same format)
+docker-compose logs -f backend
+docker-compose logs -f worker
+```
+
+### Rotation and purge policy
+
+- **Automatic rotation**: 5 MB max per file, 3 backups (`app.log.1`, `.2`, `.3`)
+- **Startup trim**: if `app.log` exceeds 10,000 lines, truncated to newest 5,000
+- **Never grows unbounded** -- RotatingFileHandler + startup trim ensures this
+
+### Configuration
+
+| Env Variable | Default | Description |
+|-------------|---------|-------------|
+| `LOG_DIR` | `logs` | Log directory path |
+| `LOG_LEVEL` | `INFO` | Console output level (DEBUG, INFO, WARNING, ERROR) |
+
+### For modules
+
+All backend modules use the centralized config:
+```python
+from app.logging_config import get_logger
+logger = get_logger(__name__)
+
+logger.info("Processing log %s", log_id)
+logger.error("Failed to connect: %s", exc)
+```
 
 ## Troubleshooting
-- Backend not ready: wait for Postgres health check; then retry.
-- Login 429s: you’ve hit the login rate limit; wait for the window or raise `LOGIN_RATE_LIMIT_*`.
-- MFA failures: confirm `AUTH_TOTP_SECRET` matches your authenticator; generate a fresh secret with `scripts/generate_mfa_secret.py`.
-- Anthropic 401s in logs: set `ANTHROPIC_API_KEY` or ignore; the app falls back to the template advisor.
+
+### "Authentication bootstrap failed"
+- Check that the backend is running: `curl http://192.168.56.102:8000/api/auth/status`
+- Check `VITE_API_BASE_URL` in `frontend/.env` matches your VM IP
+
+### Logs not appearing
+1. Check agent: `sudo journalctl -u soc-agent -f`
+2. Check worker: `docker-compose logs -f worker`
+3. Check Redis queue: `curl http://192.168.56.102:8000/api/system/health`
+4. Manual test: `curl -X POST http://192.168.56.102:8000/api/logs/ingest -H "X-Agent-Token: lab-ingest-token" -H "Content-Type: application/json" -d '{"logs":[{"source":"test","message":"test","log_level":"info","event_type":"syslog"}]}'`
+
+### Incidents not being created
+- Incidents only create when: anomaly detected (risk > threshold) OR detection rule matches OR IOC correlation hit
+- Check if `AI_AUTO_ENABLED=true` or `false` -- both work, just different recommendation quality
+- Check worker logs: `docker-compose logs -f worker`
+
+### Frontend not updating
+```bash
+docker-compose restart frontend
+```
+
+### Worker crashing
+```bash
+docker-compose logs worker | tail -20
+# Common fix: restart after config changes
+docker-compose restart worker
+```
+
+### Cannot reach VM from Windows
+- Check VirtualBox Host-Only adapter is enabled
+- Ping test: `ping 192.168.56.102`
+- Check VM IP: `ip addr show` on the VM
+
+### Docker containers not starting
+```bash
+docker-compose down
+docker-compose up -d
+docker-compose ps   # all 5 should be Up
+```
+
+## Project Structure
+
+```
+backend/
+  app/
+    main.py                  # FastAPI entry point, startup hooks
+    worker.py                # Redis Stream consumer
+    routes/
+      incidents.py           # Incident CRUD + playbook trigger
+      logs.py                # Log ingestion + query
+      config_playbooks.py    # Playbook CRUD
+      ...
+    services/
+      anomaly_detection.py   # Isolation Forest ML (15 features)
+      correlation_engine.py  # Multi-event pattern detection
+      detection_rules.py     # Custom rule evaluation
+      log_pipeline.py        # Main processing pipeline
+      threat_intel.py        # IOC management + correlation
+      playbook.py            # Automated response actions
+      claude_service.py      # AI analyst (Claude API + fallback)
+      database.py            # SQLAlchemy models
+      security.py            # Auth, rate limiting, token validation
+frontend/
+  src/
+    App.jsx                  # Main app shell + navigation
+    components/
+      CommandCenter.jsx      # Overview dashboard
+      IncidentList.jsx       # Incident management
+      LiveFeed.jsx           # Real-time log viewer (clickable)
+      AIAdvisor.jsx          # AI analyst interface
+      Alarms.jsx             # Alarm management
+      ...
+    services/
+      api.js                 # API client
+scripts/
+  soc_agent.py               # Linux log agent (systemd)
+  soc-agent.service           # systemd unit file
+  soc_manage.py              # Windows management tool
+  send_local_logs.py         # Windows endpoint log sender
+  setup_soc.py               # Attack simulation + SOC setup
+  archive_logs.py            # Log archival (cron)
+```
+
+## Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 18, Vite 5, Tailwind CSS |
+| Backend | FastAPI, SQLAlchemy, Pydantic |
+| Database | PostgreSQL 16 |
+| Queue | Redis 7 Streams |
+| ML | scikit-learn Isolation Forest |
+| AI | Anthropic Claude API (optional) |
+| Auth | HMAC-SHA256 tokens, TOTP MFA |
+| Deploy | Docker Compose, systemd |
+
+## Authentication
+
+| Role | Permissions |
+|------|------------|
+| super_admin | Full access (*) |
+| admin | User management, config, audit, playbooks |
+| analyst | View all, manage incidents, ingest logs, run playbooks |
+| viewer | Read-only access |
+
+Default user: `soc_operator` / `change-me-locally` (analyst role)
+
+## License
+
+Lab/educational use. Not for production deployment.

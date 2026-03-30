@@ -8,8 +8,9 @@ GET  /api/logs/stats   — summary statistics
 
 from datetime import datetime
 from typing import List, Optional
+import hmac
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -20,8 +21,11 @@ from ..services.database import (
 from ..services.anomaly_detection import detector
 from ..services.threat_intel import threat_intel
 from ..services.config import settings
+from ..services.security import get_current_user, AuthenticatedUser
 from ..services import event_bus, log_pipeline
+from app.logging_config import get_logger
 
+logger = get_logger(__name__)
 router = APIRouter(prefix="/api/logs", tags=["logs"])
 
 
@@ -48,6 +52,7 @@ class LogBatch(BaseModel):
 @router.post("/ingest")
 async def ingest_logs(
     payload: LogBatch,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """
@@ -55,6 +60,25 @@ async def ingest_logs(
     If USE_REDIS_STREAMS=true, enqueue to Redis Streams for async processing and return 202.
     Otherwise, process synchronously (legacy path).
     """
+    token_header = request.headers.get("x-agent-token")
+    auth_header  = request.headers.get("authorization", "")
+    bearer_token = auth_header.split(" ", 1)[1] if auth_header.lower().startswith("bearer ") else None
+    client_ip    = request.client.host if request and request.client else "unknown"
+    allowed_ips  = {settings.primary_asset_ip, "127.0.0.1", "localhost", "172.18.0.1"}
+
+    token_ok = False
+    if settings.ingest_token:
+        if token_header and hmac.compare_digest(token_header, settings.ingest_token):
+            token_ok = True
+        if bearer_token and hmac.compare_digest(bearer_token, settings.ingest_token):
+            token_ok = True
+
+    if not token_ok and settings.ingest_token and client_ip not in allowed_ips:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required (bearer token or X-Agent-Token).",
+        )
+
     logs = []
     for entry in payload.logs:
         log_dict = entry.model_dump()
@@ -70,7 +94,7 @@ async def ingest_logs(
                 status_code=status.HTTP_202_ACCEPTED,
             )
         except Exception as exc:
-            print(f"[log ingest] Redis unavailable, falling back to inline processing: {exc}")
+            logger.warning("Redis unavailable, falling back to inline processing: %s", exc)
 
     # Legacy synchronous path (also used if Redis is unavailable)
     results = [log_pipeline.process_log(db, log) for log in logs]
@@ -84,6 +108,7 @@ def get_logs(
     min_risk:    float          = Query(0.0),
     skip:        int            = Query(0, ge=0),
     limit:       int            = Query(50, le=200),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Return paginated, filtered log list."""
@@ -105,7 +130,10 @@ def get_logs(
 
 
 @router.get("/stats")
-def log_stats(db: Session = Depends(get_db)):
+def log_stats(
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Summary statistics for the dashboard."""
     total     = db.query(Log).count()
     anomalous = db.query(Log).filter(Log.is_anomalous == True).count()
@@ -128,6 +156,7 @@ def log_stats(db: Session = Depends(get_db)):
 @router.post("/analyze")
 def analyze_logs(
     limit: int = Query(100, le=500),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Re-score the most recent N unscored logs."""

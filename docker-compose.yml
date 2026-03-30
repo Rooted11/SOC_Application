@@ -24,14 +24,20 @@ services:
     restart: unless-stopped
     environment:
       ENVIRONMENT: development
-      USE_REDIS_STREAMS: "true"
-      REDIS_URL: redis://redis:6379/0
+      USE_REDIS_STREAMS: ${USE_REDIS_STREAMS:-true}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       AUTH_ENABLED: "true"
       AUTH_USERNAME: ${AUTH_USERNAME:-demo}
       AUTH_PASSWORD: ${AUTH_PASSWORD:-demo123}
       AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:-demo-secret-key-change-me}
-      CORS_ORIGINS: http://localhost:3000,http://192.168.56.101:3000
-      ALLOWED_HOSTS: localhost,127.0.0.1,192.168.56.101,testserver,backend
+      CORS_ORIGINS: http://localhost:3000,http://192.168.56.101:3000,http://192.168.56.102:3000
+      ALLOWED_HOSTS: localhost,127.0.0.1,192.168.56.101,192.168.56.102,testserver,backend
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      PRIMARY_ASSET_HOSTNAME: ${PRIMARY_ASSET_HOSTNAME:-soc-ubuntu}
+      PRIMARY_ASSET_IP: ${PRIMARY_ASSET_IP:-192.168.56.102}
+      INGEST_TOKEN: ${INGEST_TOKEN:-lab-ingest-token}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-3-haiku}
+      AI_AUTO_ENABLED: ${AI_AUTO_ENABLED:-false}
       DATABASE_URL: postgresql://soc:soc_pass@db:5432/soc_db
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       LOG_RETENTION_MINUTES: ${LOG_RETENTION_MINUTES:-5}
@@ -73,15 +79,21 @@ services:
     command: ["python", "-m", "app.worker"]
     environment:
       ENVIRONMENT: development
-      USE_REDIS_STREAMS: "true"
-      REDIS_URL: redis://redis:6379/0
+      USE_REDIS_STREAMS: ${USE_REDIS_STREAMS:-true}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       DATABASE_URL: postgresql://soc:soc_pass@db:5432/soc_db
       AUTH_ENABLED: "true"
       AUTH_USERNAME: ${AUTH_USERNAME:-demo}
       AUTH_PASSWORD: ${AUTH_PASSWORD:-demo123}
       AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:-demo-secret-key-change-me}
-      CORS_ORIGINS: http://localhost:3000,http://192.168.56.101:3000
-      ALLOWED_HOSTS: localhost,127.0.0.1,192.168.56.101,testserver,backend
+      CORS_ORIGINS: http://localhost:3000,http://192.168.56.101:3000,http://192.168.56.102:3000
+      ALLOWED_HOSTS: localhost,127.0.0.1,192.168.56.101,192.168.56.102,testserver,backend
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      PRIMARY_ASSET_HOSTNAME: ${PRIMARY_ASSET_HOSTNAME:-soc-ubuntu}
+      PRIMARY_ASSET_IP: ${PRIMARY_ASSET_IP:-192.168.56.102}
+      INGEST_TOKEN: ${INGEST_TOKEN:-lab-ingest-token}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-3-haiku}
+      AI_AUTO_ENABLED: ${AI_AUTO_ENABLED:-false}
       LOG_RETENTION_MINUTES: ${LOG_RETENTION_MINUTES:-5}
     volumes:
       - ./backend:/backend

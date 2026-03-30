@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import CommandCenter from "./components/CommandCenter";
 import Dashboard from "./components/Dashboard";
 import IncidentList from "./components/IncidentList";
@@ -18,58 +18,96 @@ import AuditLogs from "./components/AuditLogs";
 import Alarms from "./components/Alarms";
 import { api, authStorage } from "./services/api";
 
+/* ── Navigation map ────────────────────────────────────────────────────── */
+
 const NAV_GROUPS = [
   {
     title: "Operations",
+    icon: "OP",
     items: [
-      { id: "command", label: "Command Center", short: "CMD" },
-      { id: "dashboard", label: "Analytics", short: "OPS" },
-      { id: "incidents", label: "Incident Queue", short: "IR" },
-      { id: "advisor", label: "AI Analyst", short: "AI" },
-      { id: "feed", label: "Live Feed", short: "LOG" },
+      { id: "command", label: "Command Center", short: "CMD", icon: "\u25C9" },
+      { id: "dashboard", label: "Analytics", short: "OPS", icon: "\u25B2" },
+      { id: "incidents", label: "Incident Queue", short: "IR", icon: "\u26A0" },
+      { id: "advisor", label: "AI Analyst", short: "AI", icon: "\u2726" },
+      { id: "feed", label: "Live Feed", short: "LOG", icon: "\u25CE" },
     ],
   },
   {
     title: "Intel & Assets",
+    icon: "IA",
     items: [
-      { id: "threats", label: "Threat Intel", short: "IOC" },
-      { id: "assets", label: "Assets", short: "AST" },
+      { id: "threats", label: "Threat Intel", short: "IOC", icon: "\u2622" },
+      { id: "assets", label: "Assets", short: "AST", icon: "\u2B22" },
     ],
   },
   {
     title: "Configuration",
+    icon: "CF",
     items: [
-      { id: "detections", label: "Detections", short: "DR" },
-      { id: "playbooks", label: "Playbooks", short: "PB" },
-      { id: "integrations", label: "Integrations", short: "INT" },
-      { id: "notifications", label: "Notifications", short: "NTF" },
-      { id: "users", label: "Users & Roles", short: "ADM" },
-      { id: "settings", label: "Settings", short: "CFG" },
+      { id: "detections", label: "Detections", short: "DR", icon: "\u2609" },
+      { id: "playbooks", label: "Playbooks", short: "PB", icon: "\u25B6" },
+      { id: "integrations", label: "Integrations", short: "INT", icon: "\u2B58" },
+      { id: "notifications", label: "Notifications", short: "NTF", icon: "\u266A" },
+      { id: "users", label: "Users & Roles", short: "ADM", icon: "\u2605" },
+      { id: "settings", label: "Settings", short: "CFG", icon: "\u2699" },
     ],
   },
   {
     title: "Ops Health",
+    icon: "OH",
     items: [
-      { id: "alarms", label: "Alarms", short: "ALM" },
-      { id: "health", label: "System Health", short: "HLT" },
-      { id: "audit", label: "Audit Logs", short: "AUD" },
+      { id: "alarms", label: "Alarms", short: "ALM", icon: "\u23F0" },
+      { id: "health", label: "System Health", short: "HLT", icon: "\u2665" },
+      { id: "audit", label: "Audit Logs", short: "AUD", icon: "\u2637" },
     ],
   },
 ];
 const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
+
+/* ── Notification toast stack ──────────────────────────────────────────── */
+
+function ToastStack({ toasts, onDismiss }) {
+  return (
+    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none max-w-sm">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          onClick={() => onDismiss(t.id)}
+          className={`pointer-events-auto cursor-pointer rounded-xl border px-4 py-3 text-sm shadow-2xl backdrop-blur-xl animate-slideIn ${
+            t.type === "error"
+              ? "border-rose-500/40 bg-rose-950/90 text-rose-200"
+              : t.type === "success"
+                ? "border-emerald-500/40 bg-emerald-950/90 text-emerald-200"
+                : t.type === "alarm"
+                  ? "border-amber-500/40 bg-amber-950/90 text-amber-200"
+                  : "border-cyan-500/40 bg-cyan-950/90 text-cyan-200"
+          }`}
+        >
+          <div className="flex items-start gap-2">
+            <span className="text-lg leading-none mt-0.5">
+              {t.type === "error" ? "\u2716" : t.type === "success" ? "\u2714" : t.type === "alarm" ? "\u23F0" : "\u25CF"}
+            </span>
+            <div className="flex-1 min-w-0">
+              {t.title && <div className="font-semibold text-xs uppercase tracking-wider mb-0.5">{t.title}</div>}
+              <div className="leading-snug">{t.msg}</div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── Fullscreen loading/error ──────────────────────────────────────────── */
 
 function FullscreenState({ title, message, actionLabel, onAction }) {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.16),_transparent_28%),radial-gradient(circle_at_80%_20%,_rgba(249,115,22,0.12),_transparent_22%),linear-gradient(180deg,_#020617_0%,_#020617_55%,_#08111f_100%)]" />
       <div className="mx-auto flex min-h-screen max-w-3xl items-center justify-center px-6 py-12">
-          <div className="w-full rounded-[28px] border border-slate-800 bg-slate-950/80 p-10 text-center shadow-[0_30px_80px_rgba(2,6,23,0.55)] backdrop-blur">
-            <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-400">
-              Ataraxia
-            </div>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white">
-            {title}
-          </h1>
+        <div className="w-full rounded-[28px] border border-slate-800 bg-slate-950/80 p-10 text-center shadow-[0_30px_80px_rgba(2,6,23,0.55)] backdrop-blur">
+          <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-400">Ataraxia</div>
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white">{title}</h1>
           <p className="mt-3 text-sm leading-7 text-slate-400">{message}</p>
           {onAction && (
             <button
@@ -86,10 +124,13 @@ function FullscreenState({ title, message, actionLabel, onAction }) {
   );
 }
 
+/* ── Main App ──────────────────────────────────────────────────────────── */
+
 export default function App() {
   const [page, setPage] = useState("command");
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [alertBanner, setAlertBanner] = useState(null);
+  const [toasts, setToasts] = useState([]);
+  const toastIdRef = useRef(0);
   const [booting, setBooting] = useState(true);
   const [bootError, setBootError] = useState(null);
   const [authEnabled, setAuthEnabled] = useState(false);
@@ -101,24 +142,51 @@ export default function App() {
   const [openGroups, setOpenGroups] = useState(() =>
     NAV_GROUPS.reduce((acc, g) => ({ ...acc, [g.title]: true }), {})
   );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  function showAlert(msg, type = "info") {
-    setAlertBanner({ msg, type });
-    window.clearTimeout(showAlert.timeoutId);
-    showAlert.timeoutId = window.setTimeout(() => setAlertBanner(null), 4000);
-  }
+  // Live counters for badges
+  const [alarmCount, setAlarmCount] = useState(0);
+  const [incidentCount, setIncidentCount] = useState(0);
+  const [criticalCount, setCriticalCount] = useState(0);
 
+  const showAlert = useCallback((msg, type = "info", title = null) => {
+    const id = ++toastIdRef.current;
+    setToasts((prev) => [...prev.slice(-4), { id, msg, type, title }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5000);
+  }, []);
+
+  const dismissToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  // Fetch live badge counts
+  const fetchCounts = useCallback(async () => {
+    try {
+      const [alarmData, overview] = await Promise.all([
+        api.getAlarms().catch(() => []),
+        api.getOverview().catch(() => null),
+      ]);
+      const unacked = Array.isArray(alarmData)
+        ? alarmData.filter((a) => a.status !== "acknowledged").length
+        : 0;
+      setAlarmCount(unacked);
+      if (overview?.headline) {
+        setIncidentCount(overview.headline.open_incidents || 0);
+        setCriticalCount(overview.headline.critical_open || 0);
+      }
+    } catch {
+      /* silent */
+    }
+  }, []);
+
+  // Auto-refresh and real-time
   useEffect(() => {
     const refresh = () => setLastUpdated(new Date());
     const tick = () => {
-      if (document.visibilityState === "visible") {
-        refresh();
-      }
+      if (document.visibilityState === "visible") refresh();
     };
     const timer = setInterval(tick, 15_000);
-    const reloadTimer = setTimeout(() => {
-      window.location.reload();
-    }, 10 * 60 * 1000); // 10 minutes
+    const reloadTimer = setTimeout(() => window.location.reload(), 10 * 60 * 1000);
     document.addEventListener("visibilitychange", tick);
     return () => {
       clearInterval(timer);
@@ -127,14 +195,30 @@ export default function App() {
     };
   }, []);
 
+  // Fetch counts on every update
+  useEffect(() => {
+    fetchCounts();
+  }, [lastUpdated, fetchCounts]);
+
+  // SSE for real-time events
   useEffect(() => {
     if (eventSource) return;
     const es = new EventSource("/api/events/stream");
     es.onmessage = (evt) => {
       try {
         const data = JSON.parse(evt.data);
-        if (data.type === "incident_created" || data.type === "log_processed") {
+        if (data.type === "incident_created") {
           setLastUpdated(new Date());
+          showAlert(
+            data.title || "New incident detected",
+            "alarm",
+            `INCIDENT #${data.id || "?"}`
+          );
+        } else if (data.type === "log_processed") {
+          setLastUpdated(new Date());
+        } else if (data.type === "alarm_created") {
+          setLastUpdated(new Date());
+          showAlert(data.message || "New alarm raised", "alarm", "ALARM");
         }
       } catch {
         /* ignore parse errors */
@@ -146,70 +230,44 @@ export default function App() {
     };
     setEventSource(es);
     return () => es.close();
-  }, [eventSource]);
+  }, [eventSource, showAlert]);
 
+  // Auth bootstrap
   useEffect(() => {
     let active = true;
-
     async function bootstrapSession() {
       setBooting(true);
       setBootError(null);
       setAuthError(null);
-
       try {
         const status = await api.getAuthStatus();
-        if (!active) {
-          return;
-        }
-
+        if (!active) return;
         const enabled = Boolean(status.auth_enabled);
         setAuthEnabled(enabled);
         setMfaEnabled(Boolean(status.mfa_enabled));
-
         if (!enabled) {
           setUser({ username: "local-dev", mfaAuthenticated: false, roles: ["super_admin"], permissions: ["*"] });
           setBooting(false);
           return;
         }
-
         const token = authStorage.getToken();
-        if (!token) {
-          setUser(null);
-          setBooting(false);
-          return;
-        }
-
+        if (!token) { setUser(null); setBooting(false); return; }
         try {
           const me = await api.getCurrentUser();
           if (active) {
-            setUser({
-              username: me.username,
-              mfaAuthenticated: Boolean(me.mfa_authenticated),
-              roles: me.roles || [],
-              permissions: me.permissions || [],
-            });
+            setUser({ username: me.username, mfaAuthenticated: Boolean(me.mfa_authenticated), roles: me.roles || [], permissions: me.permissions || [] });
           }
         } catch {
-          if (active) {
-            authStorage.clear();
-            setUser(null);
-          }
+          if (active) { authStorage.clear(); setUser(null); }
         }
       } catch (error) {
-        if (active) {
-          setBootError(error.message || "Could not reach the authentication service.");
-        }
+        if (active) setBootError(error.message || "Could not reach the authentication service.");
       } finally {
-        if (active) {
-          setBooting(false);
-        }
+        if (active) setBooting(false);
       }
     }
-
     bootstrapSession();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -218,7 +276,6 @@ export default function App() {
       setUser(null);
       setAuthError("Session expired. Please sign in again.");
     }
-
     window.addEventListener("obsidian:unauthorized", handleUnauthorized);
     return () => window.removeEventListener("obsidian:unauthorized", handleUnauthorized);
   }, []);
@@ -226,17 +283,11 @@ export default function App() {
   async function handleLogin({ username, password, otpCode }) {
     setAuthBusy(true);
     setAuthError(null);
-
     try {
       const session = await api.login(username, password, otpCode);
       authStorage.setToken(session.access_token);
       const me = await api.getCurrentUser();
-      setUser({
-        username: me.username,
-        mfaAuthenticated: Boolean(me.mfa_authenticated),
-        roles: me.roles || [],
-        permissions: me.permissions || [],
-      });
+      setUser({ username: me.username, mfaAuthenticated: Boolean(me.mfa_authenticated), roles: me.roles || [], permissions: me.permissions || [] });
       showAlert(`Signed in as ${me.username}.`, "success");
     } catch (error) {
       authStorage.clear();
@@ -263,92 +314,111 @@ export default function App() {
   }
 
   if (booting) {
-    return (
-      <FullscreenState
-        title="Preparing secure operator session"
-        message="Checking runtime security mode and backend connectivity."
-      />
-    );
+    return <FullscreenState title="Preparing secure operator session" message="Checking runtime security mode and backend connectivity." />;
   }
-
   if (bootError) {
-    return (
-      <FullscreenState
-        title="Authentication bootstrap failed"
-        message={bootError}
-        actionLabel="Reload"
-        onAction={() => window.location.reload()}
-      />
-    );
+    return <FullscreenState title="Authentication bootstrap failed" message={bootError} actionLabel="Reload" onAction={() => window.location.reload()} />;
+  }
+  if (authEnabled && !user) {
+    return <LoginScreen busy={authBusy} error={authError} mfaEnabled={mfaEnabled} onSubmit={handleLogin} />;
   }
 
-  if (authEnabled && !user) {
-    return (
-      <LoginScreen
-        busy={authBusy}
-        error={authError}
-        mfaEnabled={mfaEnabled}
-        onSubmit={handleLogin}
-      />
-    );
-  }
+  const currentLabel = NAV_ITEMS.find((item) => item.id === page)?.label || "Command Center";
 
   return (
     <div className="min-h-screen text-slate-100 relative overflow-hidden">
-      <div className="fixed inset-0 -z-20 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.12),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(249,115,22,0.14),transparent_30%),linear-gradient(145deg,#020617,#050a19,#0b1c2e)]" />
-      <div className="fixed inset-0 -z-10 opacity-25 bg-[url('data:image/svg+xml,%3Csvg width%3D%27160%27 height%3D%27160%27 viewBox%3D%270 0 160 160%27 xmlns%3D%27http://www.w3.org/2000/svg%27%3E%3Cpath d%3D%27M0 80h160M80 0v160%27 stroke%3D%27%23374151%27 stroke-width%3D%271%27 stroke-opacity%3D%270.35%27/%3E%3C/svg%3E')]" />
+      {/* Background */}
+      <div className="fixed inset-0 -z-20 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.08),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(249,115,22,0.1),transparent_30%),linear-gradient(145deg,#020617,#050a19,#0b1c2e)]" />
+      <div className="fixed inset-0 -z-10 opacity-[0.15] bg-[url('data:image/svg+xml,%3Csvg width%3D%27160%27 height%3D%27160%27 viewBox%3D%270 0 160 160%27 xmlns%3D%27http://www.w3.org/2000/svg%27%3E%3Cpath d%3D%27M0 80h160M80 0v160%27 stroke%3D%27%23374151%27 stroke-width%3D%271%27 stroke-opacity%3D%270.35%27/%3E%3C/svg%3E')]" />
 
-      <div className="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="border-r border-cyan-500/10 bg-slate-950/70 backdrop-blur-xl">
-          <div className="border-b border-cyan-500/10 px-6 py-6">
-          <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-400">
-            Ataraxia
-          </div>
-          <div className="mt-2 text-2xl font-semibold tracking-tight text-white">
-            Nexus Deck
-          </div>
-          <p className="mt-2 max-w-xs text-sm leading-6 text-slate-400">
-            Live detection, response, and threat posture in one operator surface.
-          </p>
+      {/* Toasts */}
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
+
+      <div className={`grid min-h-screen transition-all duration-300 ${sidebarCollapsed ? "lg:grid-cols-[64px_minmax(0,1fr)]" : "lg:grid-cols-[280px_minmax(0,1fr)]"}`}>
+
+        {/* ── Sidebar ────────────────────────────────────────────────── */}
+        <aside className="border-r border-cyan-500/10 bg-slate-950/80 backdrop-blur-xl flex flex-col overflow-hidden">
+          {/* Logo */}
+          <div className="border-b border-cyan-500/10 px-4 py-5 flex items-center gap-3">
+            <button
+              onClick={() => { setPage("command"); }}
+              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+            >
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-cyan-500/20">
+                A
+              </div>
+              {!sidebarCollapsed && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.35em] text-cyan-400 leading-none">Ataraxia</div>
+                  <div className="text-sm font-semibold text-white mt-0.5">Nexus Deck</div>
+                </div>
+              )}
+            </button>
+            <button
+              onClick={() => setSidebarCollapsed((v) => !v)}
+              className="ml-auto text-slate-500 hover:text-cyan-400 transition-colors text-xs"
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {sidebarCollapsed ? "\u25B6" : "\u25C0"}
+            </button>
           </div>
 
-          <nav className="space-y-3 px-4 py-5">
+          {/* Nav */}
+          <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
             {NAV_GROUPS.map((group) => (
-              <div key={group.title} className="space-y-2">
+              <div key={group.title}>
                 <button
                   type="button"
-                  onClick={() =>
-                    setOpenGroups((prev) => ({ ...prev, [group.title]: !prev[group.title] }))
-                  }
-                  className="flex w-full items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-2 text-left text-slate-200 hover:border-cyan-400/40"
+                  onClick={() => setOpenGroups((prev) => ({ ...prev, [group.title]: !prev[group.title] }))}
+                  className={`flex w-full items-center rounded-lg px-2 py-1.5 text-left text-slate-500 hover:text-slate-300 transition-colors ${sidebarCollapsed ? "justify-center" : "justify-between"}`}
                 >
-                  <span className="text-xs uppercase tracking-[0.25em] text-slate-400">{group.title}</span>
-                  <span className="text-slate-500 text-sm">{openGroups[group.title] ? "▾" : "▸"}</span>
+                  {!sidebarCollapsed && (
+                    <span className="text-[10px] uppercase tracking-[0.25em] font-medium">{group.title}</span>
+                  )}
+                  {sidebarCollapsed ? (
+                    <span className="text-[9px] font-bold tracking-wider">{group.icon}</span>
+                  ) : (
+                    <span className="text-[10px]">{openGroups[group.title] ? "\u25BE" : "\u25B8"}</span>
+                  )}
                 </button>
-                {openGroups[group.title] && (
-                  <div className="space-y-2">
+                {(openGroups[group.title] || sidebarCollapsed) && (
+                  <div className="space-y-0.5 mt-0.5">
                     {group.items.map((item) => {
                       const active = page === item.id;
+                      const badge =
+                        item.id === "alarms" && alarmCount > 0 ? alarmCount :
+                        item.id === "incidents" && criticalCount > 0 ? criticalCount :
+                        null;
                       return (
                         <button
                           key={item.id}
                           onClick={() => setPage(item.id)}
-                          className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                          title={sidebarCollapsed ? item.label : undefined}
+                          className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left transition-all duration-150 ${
                             active
-                              ? "border-cyan-400/60 bg-gradient-to-r from-cyan-500/15 via-cyan-400/10 to-blue-500/10 text-white shadow-[0_12px_40px_rgba(34,211,238,0.15)]"
-                              : "border-slate-800/80 bg-slate-900/50 text-slate-400 hover:border-cyan-400/40 hover:text-white hover:shadow-[0_10px_30px_rgba(34,211,238,0.08)]"
-                          }`}
+                              ? "bg-gradient-to-r from-cyan-500/15 via-cyan-400/10 to-transparent border border-cyan-400/30 text-white shadow-[0_0_20px_rgba(34,211,238,0.08)]"
+                              : "border border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-white hover:border-slate-700/50"
+                          } ${sidebarCollapsed ? "justify-center px-2" : ""}`}
                         >
-                          <span
-                            className={`inline-flex h-10 w-10 items-center justify-center rounded-xl text-xs font-semibold ${
-                              active
-                                ? "bg-gradient-to-br from-cyan-500/30 to-blue-500/30 text-cyan-100 border border-cyan-400/40"
-                                : "bg-slate-800/70 text-slate-500 border border-slate-700/60"
-                            }`}
-                          >
-                            {item.short}
+                          <span className={`text-sm ${active ? "text-cyan-400" : "text-slate-500"}`}>
+                            {item.icon}
                           </span>
-                          <span className="text-sm font-medium">{item.label}</span>
+                          {!sidebarCollapsed && (
+                            <>
+                              <span className="text-[13px] font-medium flex-1">{item.label}</span>
+                              {badge != null && (
+                                <span className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold ${
+                                  item.id === "alarms" ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" :
+                                  "bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse"
+                                }`}>
+                                  {badge}
+                                </span>
+                              )}
+                            </>
+                          )}
+                          {sidebarCollapsed && badge != null && (
+                            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                          )}
                         </button>
                       );
                     })}
@@ -358,68 +428,95 @@ export default function App() {
             ))}
           </nav>
 
-          <div className="mt-auto border-t border-cyan-500/10 px-6 py-5 text-sm text-slate-400">
-            <div className="flex items-center justify-between">
-              <span>Last sync</span>
-              <span className="text-slate-200">
-                {lastUpdated.toLocaleTimeString()}
-              </span>
-            </div>
-            <div className="mt-3 flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-emerald-400">
-              <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(74,222,128,0.8)]" />
-              Monitoring active
-            </div>
-            <div className="mt-4 rounded-2xl border border-cyan-500/10 bg-slate-900/70 px-4 py-3 shadow-[0_8px_30px_rgba(6,182,212,0.08)]">
-              <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">
-                Session
+          {/* Footer */}
+          {!sidebarCollapsed && (
+            <div className="border-t border-cyan-500/10 px-4 py-4 space-y-3">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Last sync</span>
+                <span className="text-slate-300 font-mono">{lastUpdated.toLocaleTimeString()}</span>
               </div>
-              <div className="mt-2 text-sm text-slate-200">
-                {authEnabled ? user?.username : "local-dev"}
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-emerald-400">
+                <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(74,222,128,0.6)] animate-pulse" />
+                Monitoring Active
               </div>
-              <div className="mt-1 text-xs text-slate-500">
-                {authEnabled
-                  ? user?.mfaAuthenticated
-                    ? "Protected operator access with MFA"
-                    : mfaEnabled
-                      ? "Protected operator access pending MFA"
-                      : "Protected operator access"
-                  : "Development mode"}
+              <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Operator</div>
+                <div className="text-sm text-slate-200 mt-1 font-medium">
+                  {authEnabled ? user?.username : "local-dev"}
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">
+                  {authEnabled
+                    ? user?.mfaAuthenticated ? "MFA verified" : "Authenticated"
+                    : "Development mode"}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </aside>
 
+        {/* ── Main content ───────────────────────────────────────────── */}
         <div className="flex min-w-0 flex-col">
-          <header className="border-b border-cyan-500/10 bg-slate-950/60 px-6 py-5 backdrop-blur-xl shadow-[0_10px_40px_rgba(6,182,212,0.08)]">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          {/* Header */}
+          <header className="border-b border-cyan-500/10 bg-slate-950/60 backdrop-blur-xl">
+            <div className="flex items-center justify-between px-6 py-4">
               <div>
-                <div className="text-[11px] uppercase tracking-[0.35em] text-slate-500">
+                <div className="text-[10px] uppercase tracking-[0.35em] text-slate-500">
                   Security Operations Center
                 </div>
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
-                  {NAV_ITEMS.find((item) => item.id === page)?.label}
+                <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">
+                  {currentLabel}
                 </h1>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.25em] text-slate-400">
-                <div className="rounded-full border border-slate-800 bg-slate-900/70 px-4 py-2">
-                  Auto refresh 15s (visible tab) · Hard reload every 10m
-                </div>
-                <div className="rounded-full border border-slate-800 bg-slate-900/70 px-4 py-2">
-                  {authEnabled
-                    ? user?.mfaAuthenticated
-                      ? `MFA active: ${user?.username}`
-                      : `Signed in: ${user?.username}`
-                    : "Local dev"}
-                </div>
-                <div className="rounded-full border border-slate-800 bg-slate-900/70 px-4 py-2">
-                  Playbooks armed
-                </div>
+              <div className="flex items-center gap-2">
+                {/* Live status badges */}
+                {criticalCount > 0 && (
+                  <button
+                    onClick={() => setPage("incidents")}
+                    className="flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-950/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/80 transition-colors animate-pulse"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-red-500" />
+                    {criticalCount} Critical
+                  </button>
+                )}
+                {incidentCount > 0 && (
+                  <button
+                    onClick={() => setPage("incidents")}
+                    className="flex items-center gap-1.5 rounded-full border border-orange-500/30 bg-orange-950/40 px-3 py-1.5 text-xs text-orange-400 hover:bg-orange-950/60 transition-colors"
+                  >
+                    {incidentCount} Open
+                  </button>
+                )}
+
+                {/* Alarm bell */}
+                <button
+                  onClick={() => setPage("alarms")}
+                  className={`relative rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                    alarmCount > 0
+                      ? "border-amber-500/40 bg-amber-950/50 text-amber-400 hover:bg-amber-950/70"
+                      : "border-slate-700 bg-slate-900/70 text-slate-400 hover:border-slate-600"
+                  }`}
+                >
+                  <span className="mr-1">{"\u23F0"}</span>
+                  {alarmCount > 0 ? `${alarmCount} Alarms` : "Alarms"}
+                  {alarmCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-500 animate-ping opacity-75" />
+                  )}
+                </button>
+
+                {/* Quick nav */}
+                <button
+                  onClick={() => setPage("feed")}
+                  className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-400 hover:border-cyan-500/40 hover:text-cyan-400 transition-colors"
+                >
+                  Live Feed
+                </button>
+
                 {authEnabled && (
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="rounded-full border border-slate-800 bg-slate-900/70 px-4 py-2 text-slate-300 transition hover:border-slate-700 hover:text-white"
+                    className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-400 transition hover:border-slate-700 hover:text-white"
                   >
                     Sign out
                   </button>
@@ -428,26 +525,13 @@ export default function App() {
             </div>
           </header>
 
-          {alertBanner && (
-            <div
-              className={`mx-6 mt-4 rounded-2xl border px-4 py-3 text-sm ${
-                alertBanner.type === "error"
-                  ? "border-rose-500/30 bg-rose-500/10 text-rose-200"
-                  : alertBanner.type === "success"
-                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
-                    : "border-cyan-500/30 bg-cyan-500/10 text-cyan-200"
-              }`}
-            >
-              {alertBanner.msg}
-            </div>
-          )}
-
+          {/* Page content */}
           <main className="min-w-0 flex-1 overflow-auto px-6 py-6">
-            {page === "command" && <CommandCenter lastUpdated={lastUpdated} showAlert={showAlert} />}
-            {page === "dashboard" && <Dashboard lastUpdated={lastUpdated} showAlert={showAlert} />}
+            {page === "command" && <CommandCenter lastUpdated={lastUpdated} showAlert={showAlert} setPage={setPage} />}
+            {page === "dashboard" && <Dashboard lastUpdated={lastUpdated} showAlert={showAlert} setPage={setPage} />}
             {page === "incidents" && <IncidentList lastUpdated={lastUpdated} showAlert={showAlert} />}
             {page === "advisor" && <AIAdvisor lastUpdated={lastUpdated} showAlert={showAlert} />}
-            {page === "feed" && <LiveFeed lastUpdated={lastUpdated} showAlert={showAlert} />}
+            {page === "feed" && <LiveFeed lastUpdated={lastUpdated} showAlert={showAlert} setPage={setPage} />}
             {page === "threats" && <ThreatTrends lastUpdated={lastUpdated} showAlert={showAlert} />}
             {page === "assets" && <AssetInventory lastUpdated={lastUpdated} showAlert={showAlert} />}
             {page === "detections" && <Detections showAlert={showAlert} />}
@@ -456,12 +540,21 @@ export default function App() {
             {page === "notifications" && <NotificationsPage showAlert={showAlert} />}
             {page === "users" && <UsersRoles showAlert={showAlert} />}
             {page === "settings" && <SettingsPage showAlert={showAlert} />}
-            {page === "health" && <SystemHealth showAlert={showAlert} />}
-            {page === "alarms" && <Alarms showAlert={showAlert} />}
+            {page === "health" && <SystemHealth lastUpdated={lastUpdated} showAlert={showAlert} />}
+            {page === "alarms" && <Alarms lastUpdated={lastUpdated} showAlert={showAlert} />}
             {page === "audit" && <AuditLogs showAlert={showAlert} />}
           </main>
         </div>
       </div>
+
+      {/* Slide-in animation style */}
+      <style>{`
+        @keyframes slideIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        .animate-slideIn { animation: slideIn 0.3s ease-out; }
+      `}</style>
     </div>
   );
 }

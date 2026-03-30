@@ -1,12 +1,13 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Prefer the Ubuntu VM IP when the dev server runs on Windows,
-// otherwise fall back to localhost (Ubuntu host) or explicit env overrides.
+// Proxy target for the Vite dev server.
+// Priority: VITE_API_BASE_URL → BACKEND_URL → VITE_BACKEND_URL → platform default
 const proxyTarget =
+  process.env.VITE_API_BASE_URL ||
   process.env.BACKEND_URL ||
   process.env.VITE_BACKEND_URL ||
-  (process.platform === "win32" ? "http://192.168.56.101:8000" : "http://localhost:8000");
+  (process.platform === "win32" ? "http://192.168.56.102:8000" : "http://localhost:8000");
 
 export default defineConfig({
   plugins: [react()],

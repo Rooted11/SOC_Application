@@ -419,14 +419,23 @@ def init_db():
         _seed_roles_and_admin(db)
         _seed_settings(db)
         if db.query(Asset).count() == 0:
-            db.add_all([
-                Asset(hostname="web-server-01",  ip_address="10.0.1.10",   asset_type="server",      department="Engineering",  criticality="high"),
-                Asset(hostname="db-server-01",   ip_address="10.0.1.20",   asset_type="server",      department="Engineering",  criticality="critical"),
-                Asset(hostname="workstation-42", ip_address="10.0.2.42",   asset_type="workstation", department="Finance",      criticality="medium"),
-                Asset(hostname="vpn-gateway",    ip_address="203.0.113.1", asset_type="network",     department="IT",           criticality="high"),
-                Asset(hostname="mail-server-01", ip_address="10.0.1.30",   asset_type="server",      department="IT",           criticality="high"),
-                Asset(hostname="dc-server-01",   ip_address="10.0.1.5",    asset_type="server",      department="IT",           criticality="critical"),
-            ])
+            if settings.seed_demo_data:
+                db.add_all([
+                    Asset(hostname="web-server-01",  ip_address="10.0.1.10",   asset_type="server",      department="Engineering",  criticality="high"),
+                    Asset(hostname="db-server-01",   ip_address="10.0.1.20",   asset_type="server",      department="Engineering",  criticality="critical"),
+                    Asset(hostname="workstation-42", ip_address="10.0.2.42",   asset_type="workstation", department="Finance",      criticality="medium"),
+                    Asset(hostname="vpn-gateway",    ip_address="203.0.113.1", asset_type="network",     department="IT",           criticality="high"),
+                    Asset(hostname="mail-server-01", ip_address="10.0.1.30",   asset_type="server",      department="IT",           criticality="high"),
+                    Asset(hostname="dc-server-01",   ip_address="10.0.1.5",    asset_type="server",      department="IT",           criticality="critical"),
+                ])
+            else:
+                db.add(Asset(
+                    hostname=settings.primary_asset_hostname,
+                    ip_address=settings.primary_asset_ip,
+                    asset_type="server",
+                    department="IT",
+                    criticality="high",
+                ))
             db.commit()
     finally:
         db.close()

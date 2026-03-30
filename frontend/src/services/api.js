@@ -9,15 +9,15 @@
  * VITE_API_URL=http://192.168.56.101:8000 so requests hit the Ubuntu backend.
  */
 
-const RAW_BASE = import.meta.env.VITE_API_URL || "/api";
-const BASE = RAW_BASE.replace(/\/+$/, "");
+// VITE_API_BASE_URL = backend origin, e.g. http://192.168.56.102:8000
+// All request paths already include /api/... so we just prepend the origin.
+const ORIGIN = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 const TOKEN_KEY = "obsidian-nexus-access-token";
 
 function buildUrl(path) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return BASE === "/api" && normalizedPath.startsWith("/api")
-    ? normalizedPath
-    : `${BASE}${normalizedPath}`;
+  // If an absolute origin is set, prefix it; otherwise use relative paths (Vite proxy)
+  return ORIGIN ? `${ORIGIN}${normalizedPath}` : normalizedPath;
 }
 
 function dispatchUnauthorized() {

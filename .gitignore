@@ -13,3 +13,6 @@ frontend/dist/
 
 .DS_Store
 Thumbs.db
+
+logs/
+*.log

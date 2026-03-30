@@ -67,14 +67,18 @@ def process_log(db, log_dict: dict) -> dict:
     if score_result["is_anomalous"] or ioc_matches:
         sev = detector.classify_severity(score_result["risk_score"])
 
-        rec = generate_incident_recommendation(
-            incident_title  = f"Anomaly: {log_dict.get('event_type')} from {log_dict.get('ip_src')}",
-            severity        = sev,
-            risk_score      = score_result["risk_score"],
-            ioc_matches     = ioc_matches,
-            explanation     = score_result["explanation"],
-            event_type      = log_dict.get("event_type") or "",
-            affected_assets = [asset.hostname] if asset else [],
+        rec = (
+            generate_incident_recommendation(
+                incident_title  = f"Anomaly: {log_dict.get('event_type')} from {log_dict.get('ip_src')}",
+                severity        = sev,
+                risk_score      = score_result["risk_score"],
+                ioc_matches     = ioc_matches,
+                explanation     = score_result["explanation"],
+                event_type      = log_dict.get("event_type") or "",
+                affected_assets = [asset.hostname] if asset else [],
+            )
+            if config.settings.ai_auto_enabled
+            else "AI auto-recommendations are disabled (set AI_AUTO_ENABLED=true to enable)."
         )
 
         incident = Incident(

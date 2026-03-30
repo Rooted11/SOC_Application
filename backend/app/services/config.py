@@ -49,6 +49,12 @@ class Settings:
     cors_origins: list[str]
     allowed_hosts: list[str]
     enable_api_docs: bool
+    seed_demo_data: bool
+    primary_asset_hostname: str
+    primary_asset_ip: str
+    ingest_token: str
+    ai_auto_enabled: bool
+    ai_model: str
 
     @property
     def is_production(self) -> bool:
@@ -99,7 +105,7 @@ def load_settings() -> Settings:
         cors_origins=_parse_csv(
             os.getenv("CORS_ORIGINS"),
             default=(
-                "http://localhost:3000,http://192.168.56.101:3000"
+                "http://localhost:3000,http://192.168.56.101:3000,http://192.168.56.102:3000"
                 if not is_production
                 else ""
             ),
@@ -107,7 +113,7 @@ def load_settings() -> Settings:
         allowed_hosts=_parse_csv(
             os.getenv("ALLOWED_HOSTS"),
             default=(
-                "localhost,127.0.0.1,192.168.56.101,testserver,backend"
+                "localhost,127.0.0.1,192.168.56.101,192.168.56.102,testserver,backend"
                 if not is_production
                 else ""
             ),
@@ -116,6 +122,24 @@ def load_settings() -> Settings:
             os.getenv("ENABLE_API_DOCS"),
             default=not is_production,
         ),
+        seed_demo_data=_parse_bool(
+            os.getenv("SEED_DEMO_DATA"),
+            default=True,
+        ),
+        primary_asset_hostname=os.getenv(
+            "PRIMARY_ASSET_HOSTNAME",
+            os.getenv("HOSTNAME", "soc-host"),
+        ),
+        primary_asset_ip=os.getenv(
+            "PRIMARY_ASSET_IP",
+            "192.168.56.102",
+        ),
+        ingest_token=os.getenv("INGEST_TOKEN", ""),
+        ai_auto_enabled=_parse_bool(
+            os.getenv("AI_AUTO_ENABLED"),
+            default=False,
+        ),
+        ai_model=os.getenv("ANTHROPIC_MODEL") or os.getenv("CLAUDE_MODEL") or "claude-3-haiku",
     )
 
 
