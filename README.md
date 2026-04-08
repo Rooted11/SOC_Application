@@ -7,6 +7,8 @@ environments, presentations, and security research.
 ---
 
 ## Architecture
+All IP addresses and infrastructure shown are part of a simulated lab environment and do not represent live systems.
+``
 
 ```
   Windows Host (192.168.56.1)              Ubuntu VM (192.168.56.102)
