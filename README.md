@@ -8,14 +8,13 @@ environments, presentations, and security research.
 > ⚠️ **Project Status:** In testing and active development. Features, detections, and interfaces are subject to change.
 
 
-## Security & Disclaimer
+## Learning Objectives
 
-This project is developed for academic and educational purposes as part of UW–Stout CNIT 361.
-
-All IP addresses, logs, infrastructure, indicators, and scenarios shown in this repository are part of a **simulated lab environment**. No production systems, real organizations, or live networks are represented.
-
-The application is currently in testing and active development and should not be deployed in production environments.
-
+- Simulate SOC alert triage and investigation workflows
+- Apply machine learning techniques to security telemetry
+- Correlate multi‑event attack patterns
+- Evaluate automated vs. human‑driven incident response
+- Gain hands‑on experience with modern SOC architectures
 
 
 ## Architecture
