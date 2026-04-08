@@ -417,6 +417,7 @@ scripts/
 Default user: `soc_operator` / `change-me-locally` (analyst role)
 
 ## License
+Lab/educational use. Not for production deployment.
 ## Security & Disclaimer
 
 This project is developed for academic and educational purposes
@@ -425,4 +426,3 @@ All IP addresses, logs, infrastructure, indicators, and scenarios shown in this 
 
 The application is currently in testing and active development and should not be deployed in production environments.
 ``
-Lab/educational use. Not for production deployment.
