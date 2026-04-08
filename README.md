@@ -5,6 +5,18 @@ threat intelligence correlation, and AI-assisted investigation. Built for lab
 environments, presentations, and security research.
 
 ---
+> ⚠️ **Project Status:** In testing and active development. Features, detections, and interfaces are subject to change.
+
+
+## Security & Disclaimer
+
+This project is developed for academic and educational purposes as part of UW–Stout CNIT 361.
+
+All IP addresses, logs, infrastructure, indicators, and scenarios shown in this repository are part of a **simulated lab environment**. No production systems, real organizations, or live networks are represented.
+
+The application is currently in testing and active development and should not be deployed in production environments.
+
+
 
 ## Architecture
 All IP addresses and infrastructure shown are part of a simulated lab environment and do not represent live systems.
