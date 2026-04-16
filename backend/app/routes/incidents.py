@@ -101,6 +101,11 @@ class AssetUpdate(BaseModel):
         return v.strip() if v else v
 
 
+class ThreatIntelPurgeRequest(BaseModel):
+    older_than_days: Optional[int] = None
+    indicator_ids: Optional[List[int]] = None
+
+
 # ── Incidents ─────────────────────────────────────────────────────────────
 
 @router.get("/api/incidents")
@@ -418,6 +423,35 @@ def refresh_threat_feed(db: Session = Depends(get_db)):
         "loaded_from_file": added_file,
         "fetched_live":     len(added_live),
         "total_added":      added_file + len(added_live),
+    }
+
+
+@router.delete("/api/threat-intel")
+def purge_threat_intel(
+    payload: ThreatIntelPurgeRequest,
+    db: Session = Depends(get_db),
+):
+    """Purge threat indicators by age, explicit IDs, or both."""
+    q = db.query(ThreatIndicator)
+
+    if payload.older_than_days is not None:
+      if payload.older_than_days < 0:
+          raise HTTPException(400, "older_than_days must be >= 0")
+      cutoff = datetime.utcnow() - timedelta(days=payload.older_than_days)
+      q = q.filter(ThreatIndicator.last_seen < cutoff)
+
+    if payload.indicator_ids:
+        q = q.filter(ThreatIndicator.id.in_(payload.indicator_ids))
+
+    if payload.older_than_days is None and not payload.indicator_ids:
+        raise HTTPException(400, "Provide older_than_days or indicator_ids")
+
+    deleted = q.delete(synchronize_session=False)
+    db.commit()
+    return {
+        "deleted": deleted,
+        "older_than_days": payload.older_than_days,
+        "ids_count": len(payload.indicator_ids or []),
     }
 
 

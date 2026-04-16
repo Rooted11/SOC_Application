@@ -5,26 +5,26 @@
     Run this AFTER installing Windows Server and logging in as Administrator.
 
 .DESCRIPTION
-    - Sets static IP on the Host-Only adapter (192.168.56.10)
+    - Sets static IP on the Host-Only adapter (<DC01_IP>)
     - Renames computer to DC01
     - Installs AD DS + DNS roles
-    - Promotes to Domain Controller for lab.local
+    - Promotes to Domain Controller for example.local
     - The server will REBOOT after promotion
 
 .NOTES
-    SOC Lab Network: 192.168.56.0/24
-    Ubuntu SOC:      192.168.56.102
-    Windows Host:    192.168.56.1
-    This DC:         192.168.56.10
+    SOC Lab Network: <LAB_SUBNET>/24
+    Ubuntu SOC:      <SOC_UBUNTU_IP>
+    Windows Host:    <VM_HOST_IP>
+    This DC:         <DC01_IP>
 #>
 
 Write-Host "`n=== SOC Lab - Domain Controller Setup (Phase 1) ===" -ForegroundColor Cyan
-Write-Host "This script will configure this server as DC01.lab.local`n"
+Write-Host "This script will configure this server as DC01.example.local`n"
 
 # ── Step 1: Configure Static IP ──────────────────────────────────────
 Write-Host "[1/4] Configuring static IP address..." -ForegroundColor Yellow
 
-# Find the Host-Only adapter (the one on 192.168.56.x or the first Ethernet adapter)
+# Find the Host-Only adapter (the one on <LAB_SUBNET>.x or the first Ethernet adapter)
 $adapter = Get-NetAdapter | Where-Object {
     $_.Status -eq 'Up' -and $_.InterfaceDescription -notmatch 'Loopback'
 } | Select-Object -First 1
@@ -41,15 +41,15 @@ Remove-NetIPAddress -InterfaceIndex $adapter.ifIndex -Confirm:$false -ErrorActio
 Remove-NetRoute -InterfaceIndex $adapter.ifIndex -Confirm:$false -ErrorAction SilentlyContinue
 
 New-NetIPAddress -InterfaceIndex $adapter.ifIndex `
-    -IPAddress "192.168.56.10" `
+    -IPAddress "<DC01_IP>" `
     -PrefixLength 24 `
-    -DefaultGateway "192.168.56.1" -ErrorAction SilentlyContinue
+    -DefaultGateway "<VM_HOST_IP>" -ErrorAction SilentlyContinue
 
 # DNS: point to self (will be DNS server) and Google as fallback
 Set-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex `
-    -ServerAddresses @("192.168.56.10", "8.8.8.8")
+    -ServerAddresses @("<DC01_IP>", "8.8.8.8")
 
-Write-Host "  Static IP set: 192.168.56.10/24" -ForegroundColor Green
+Write-Host "  Static IP set: <DC01_IP>/24" -ForegroundColor Green
 
 # Check for NAT adapter and configure it for internet
 $natAdapter = Get-NetAdapter | Where-Object {
@@ -80,19 +80,19 @@ Write-Host "  AD DS and DNS roles installed" -ForegroundColor Green
 
 # ── Step 4: Promote to Domain Controller ─────────────────────────────
 Write-Host "`n[4/4] Promoting to Domain Controller..." -ForegroundColor Yellow
-Write-Host "  Domain: lab.local"
+Write-Host "  Domain: example.local"
 Write-Host "  NetBIOS: LAB"
 Write-Host ""
 Write-Host "  You will be prompted for a DSRM (Directory Services Restore Mode) password."
-Write-Host "  Use a strong password (e.g., P@ssw0rd!Lab2024)" -ForegroundColor Yellow
+Write-Host "  Use a strong password (e.g., <STRONG_PASSWORD>)" -ForegroundColor Yellow
 Write-Host ""
 
 # Prompt for DSRM password
 $dsrmPassword = Read-Host -AsSecureString "Enter DSRM password"
 
 Install-ADDSForest `
-    -DomainName "lab.local" `
-    -DomainNetbiosName "LAB" `
+    -DomainName "example.local" `
+    -DomainNetbiosName "<NETBIOS>" `
     -ForestMode "WinThreshold" `
     -DomainMode "WinThreshold" `
     -InstallDns:$true `
@@ -105,4 +105,4 @@ Install-ADDSForest `
 
 # Server will reboot automatically after promotion
 Write-Host "`n=== Server will reboot now to complete DC promotion ===" -ForegroundColor Cyan
-Write-Host "After reboot, log in as LAB\Administrator and run dc01-phase2.ps1" -ForegroundColor Yellow
+Write-Host "After reboot, log in as EXAMPLE\Administrator and run dc01-phase2.ps1" -ForegroundColor Yellow

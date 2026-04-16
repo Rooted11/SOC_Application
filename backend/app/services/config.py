@@ -105,7 +105,7 @@ def load_settings() -> Settings:
         cors_origins=_parse_csv(
             os.getenv("CORS_ORIGINS"),
             default=(
-                "http://localhost:3000,http://192.168.56.101:3000,http://192.168.56.102:3000"
+                "http://localhost:3000,http://<WIN_HOST_IP>:3000,http://<SOC_UBUNTU_IP>:3000"
                 if not is_production
                 else ""
             ),
@@ -113,7 +113,7 @@ def load_settings() -> Settings:
         allowed_hosts=_parse_csv(
             os.getenv("ALLOWED_HOSTS"),
             default=(
-                "localhost,127.0.0.1,192.168.56.101,192.168.56.102,testserver,backend"
+                "localhost,127.0.0.1,<WIN_HOST_IP>,<SOC_UBUNTU_IP>,testserver,backend"
                 if not is_production
                 else ""
             ),
@@ -132,7 +132,7 @@ def load_settings() -> Settings:
         ),
         primary_asset_ip=os.getenv(
             "PRIMARY_ASSET_IP",
-            "192.168.56.102",
+            "<SOC_UBUNTU_IP>",
         ),
         ingest_token=os.getenv("INGEST_TOKEN", ""),
         ai_auto_enabled=_parse_bool(

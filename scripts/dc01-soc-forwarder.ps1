@@ -3,14 +3,14 @@
 .SYNOPSIS
     Windows Event Log forwarder for Ataraxia SOC.
     Reads security-relevant events from Windows Event Logs and POSTs them
-    as JSON to the SOC backend at 192.168.56.102:8000.
+    as JSON to the SOC backend at <SOC_UBUNTU_IP>:8000.
 
 .DESCRIPTION
     Runs in a loop, collecting new events every $IntervalSeconds.
     Maps Windows Event IDs to SOC event types for proper detection pipeline processing.
 
 .PARAMETER SOCEndpoint
-    SOC backend URL (default: http://192.168.56.102:8000)
+    SOC backend URL (default: http://<SOC_UBUNTU_IP>:8000)
 
 .PARAMETER IngestToken
     Token for the SOC ingest API (default: lab-ingest-token)
@@ -28,14 +28,14 @@
 #>
 
 param(
-    [string]$SOCEndpoint = "http://192.168.56.102:8000",
+    [string]$SOCEndpoint = "http://<SOC_UBUNTU_IP>:8000",
     [string]$IngestToken = "lab-ingest-token",
     [int]$IntervalSeconds = 15,
     [switch]$Once
 )
 
 $IngestUrl = "$SOCEndpoint/api/logs/ingest"
-$Source = "dc01.lab.local"
+$Source = "dc01.example.local"
 
 # ── Event ID to SOC event type mapping ─────────────────────────────────
 
@@ -196,7 +196,7 @@ function Convert-EventToSOC {
         timestamp  = $Event.TimeCreated.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
         log_level  = $logLevel
         message    = $message
-        ip_src     = if ($ipSrc -and $ipSrc -ne "-") { $ipSrc } else { "192.168.56.10" }
+        ip_src     = if ($ipSrc -and $ipSrc -ne "-") { $ipSrc } else { "<DC01_IP>" }
         ip_dst     = $ipDst
         user       = $userName
         event_type = $eventType

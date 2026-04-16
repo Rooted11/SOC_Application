@@ -293,18 +293,18 @@ def generate_attack_logs():
         ts = (now - timedelta(minutes=random.randint(1, 60))).isoformat()
         user = random.choice(normal_users)
         messages = [
-            f"sshd[{random.randint(1000,9999)}]: Accepted publickey for {user} from 192.168.56.1 port {random.randint(40000,60000)}",
+            f"sshd[{random.randint(1000,9999)}]: Accepted publickey for {user} from <VM_HOST_IP> port {random.randint(40000,60000)}",
             f"CRON[{random.randint(1000,9999)}]: (root) CMD (/usr/bin/python3 /opt/check_health.py)",
             f"systemd[1]: Started Session {random.randint(100,999)} of user {user}.",
-            f"sshd[{random.randint(1000,9999)}]: Received disconnect from 192.168.56.1 port {random.randint(40000,60000)}:11: disconnected by user",
-            f"kernel: [UFW ALLOW] IN=eth0 OUT= SRC=192.168.56.1 DST=192.168.56.102 PROTO=TCP DPT=22",
+            f"sshd[{random.randint(1000,9999)}]: Received disconnect from <VM_HOST_IP> port {random.randint(40000,60000)}:11: disconnected by user",
+            f"kernel: [UFW ALLOW] IN=eth0 OUT= SRC=<VM_HOST_IP> DST=<SOC_UBUNTU_IP> PROTO=TCP DPT=22",
         ]
         logs.append({
             "source": random.choice(["auth", "syslog", "kern"]),
             "timestamp": ts,
             "log_level": "info",
             "message": random.choice(messages),
-            "ip_src": "192.168.56.1",
+            "ip_src": "<VM_HOST_IP>",
             "event_type": random.choice(["ssh_event", "scheduled_task", "system_event", "syslog"]),
             "user": user,
             "raw_data": {"host": "kali-linux", "log_file": random.choice(["auth.log", "syslog", "kern.log"])},

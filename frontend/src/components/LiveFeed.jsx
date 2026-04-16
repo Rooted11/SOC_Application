@@ -3,8 +3,9 @@
  * Auto-refreshes every 5 seconds. Click any log row to inspect it.
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { api } from "../services/api";
+import { formatMountainDateTime, formatMountainTime } from "../utils/time";
 
 const RISK_COLOR = (r) => {
   if (r >= 80) return "text-red-400";
@@ -53,14 +54,16 @@ const HIGH_RISK = new Set([
 ]);
 
 function formatTime(ts) {
-  if (!ts) return "--:--:--";
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return formatMountainTime(ts);
 }
 
 function formatDate(ts) {
-  if (!ts) return "";
-  return new Date(ts).toLocaleString();
+  return formatMountainDateTime(ts);
+}
+
+function formatLastSeen(ts) {
+  if (!ts) return "never";
+  return formatMountainDateTime(ts);
 }
 
 // --- Detail Panel (right side when a log is selected) ---
@@ -109,6 +112,48 @@ function LogDetail({ log, onClose, onDelete, setPage }) {
             )}
           </div>
         )}
+
+        {/* Asset context */}
+        {log.asset && (
+          <div className="rounded-lg border border-cyan-800 bg-cyan-950/20 p-3 text-xs space-y-1">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white">
+              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full border ${ASSET_COLOR[log.asset.asset_type] || "border-cyan-700 text-cyan-400"} text-[11px]`}>
+                {ASSET_ICON[log.asset.asset_type] || log.asset.hostname?.[0]?.toUpperCase() || "A"}
+              </span>
+              Asset Target
+            </div>
+            <div className="flex items-center justify-between">
+              <span>{log.asset.hostname || log.asset.ip_address || `Asset #${log.asset.id}`}</span>
+              <span className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">
+                {log.asset.is_isolated ? "Isolated" : "Live"}
+              </span>
+            </div>
+            <div className="text-[11px] text-gray-300">
+              {log.asset.department || "Department unknown"} • {log.asset.criticality || "medium"} criticality
+            </div>
+          </div>
+        )}
+
+        {/* Threat source */}
+        <div className="rounded-lg border border-amber-800 bg-amber-950/20 p-3 text-xs space-y-1">
+          <div className="flex items-center justify-between text-[11px] text-amber-200 uppercase tracking-[0.2em]">
+            <span>Threat Source</span>
+            <span className="text-[10px] text-slate-400">
+              {(log.event_type || "unknown").replace(/_/g, " ")}
+            </span>
+          </div>
+          <div className="text-sm font-semibold text-white">
+            {log.ip_src || "unknown IP"} {log.user ? `• ${log.user}` : ""}
+          </div>
+          <div className="text-[11px] text-gray-300">
+            Source type: {log.source || "unknown"} • Risk {Math.round(log.risk_score || 0)}/100
+          </div>
+          {log.explanation && (
+            <div className="text-[11px] text-gray-400">
+              {log.explanation}
+            </div>
+          )}
+        </div>
 
         {/* Linked incident */}
         {log.incident_id && (
@@ -242,13 +287,26 @@ const EVENT_FILTERS = [
 // Map a log to its asset by matching source/hostname or ip_src to asset records
 function resolveAsset(log, assets) {
   if (!assets || assets.length === 0) return null;
-  const src = (log.source || "").toLowerCase();
-  const ip = (log.ip_src || "").toLowerCase();
+
+  if (log.asset_id != null) {
+    const byId = assets.find((a) => String(a.id) === String(log.asset_id));
+    if (byId) return byId;
+  }
+
+  const normalizeHost = (value) => String(value || "").toLowerCase().split(".")[0];
+  const src = normalizeHost(log.source);
+  const ipSrc = String(log.ip_src || "").toLowerCase();
+  const ipDst = String(log.ip_dst || "").toLowerCase();
+
   return assets.find(
-    (a) =>
-      (a.hostname && src.includes(a.hostname.toLowerCase())) ||
-      (a.ip_address && (a.ip_address === ip || a.ip_address === src)) ||
-      (a.hostname && a.hostname.toLowerCase() === src)
+    (a) => {
+      const host = normalizeHost(a.hostname);
+      const ip = String(a.ip_address || "").toLowerCase();
+      return (
+        (host && src && (src === host || src.includes(host) || host.includes(src))) ||
+        (ip && (ip === ipSrc || ip === ipDst || ip === src))
+      );
+    }
   ) || null;
 }
 
@@ -282,6 +340,28 @@ export default function LiveFeed({ lastUpdated, showAlert, setPage }) {
   const [confirmAction,  setConfirmAction]  = useState(null); // "clear" | "archive" | null
   const prevIds     = useRef(new Set());
   const intervalRef = useRef(null);
+  const annotatedLogs = useMemo(
+    () => logs.map((log) => ({ ...log, asset: resolveAsset(log, assets) })),
+    [logs, assets]
+  );
+  const assetSummary = useMemo(() => {
+    const tracker = new Map();
+    annotatedLogs.forEach((log) => {
+      const asset = log.asset;
+      if (!asset) return;
+      const key = asset.hostname || asset.ip_address || asset.id;
+      if (!tracker.has(key)) {
+        tracker.set(key, { asset, count: 0, lastSeen: 0 });
+      }
+      const entry = tracker.get(key);
+      entry.count += 1;
+      const ts = log.timestamp ? new Date(log.timestamp).getTime() : 0;
+      entry.lastSeen = Math.max(entry.lastSeen, ts);
+    });
+    return Array.from(tracker.values())
+      .sort((a, b) => b.count - a.count || b.lastSeen - a.lastSeen)
+      .slice(0, 3);
+  }, [annotatedLogs]);
 
   const handleClearAll = async () => {
     try {
@@ -473,6 +553,37 @@ export default function LiveFeed({ lastUpdated, showAlert, setPage }) {
           </div>
         )}
 
+        {assetSummary.length > 0 && (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {assetSummary.map(({ asset, count, lastSeen }) => {
+              const type = asset.asset_type || "server";
+              const icon = ASSET_ICON[type] || (asset.hostname ? asset.hostname[0]?.toUpperCase() : "A");
+              const badgeClass = ASSET_COLOR[type] || "bg-gray-800 border-gray-700 text-gray-400";
+              return (
+                <div key={asset.id} className="rounded-2xl border border-gray-800 bg-gray-950/60 p-3 text-xs text-gray-300">
+                  <div className="flex items-center gap-3">
+                    <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl border ${badgeClass} text-sm font-semibold`}>
+                      {icon}
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-white">
+                        {asset.hostname || asset.ip_address || `Asset #${asset.id}`}
+                      </div>
+                      <div className="text-[11px] text-gray-500 uppercase tracking-wider">
+                        {type} • {asset.department || "unknown"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-[11px] text-gray-400">
+                    <span>{count} logs</span>
+                    <span>Last seen {formatLastSeen(lastSeen)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* ── Event type filters ──────────────────────────────────────── */}
         <div className="flex gap-1 flex-wrap">
           {EVENT_FILTERS.map((f) => (
@@ -501,6 +612,7 @@ export default function LiveFeed({ lastUpdated, showAlert, setPage }) {
                   <th className="text-left p-2 pl-3 w-8"></th>
                   <th className="text-left p-2">Time</th>
                   <th className="text-left p-2">Source</th>
+                  <th className="text-left p-2">Asset</th>
                   <th className="text-left p-2">Event</th>
                   <th className="text-left p-2">IP</th>
                   <th className="text-left p-2">User</th>
@@ -509,7 +621,7 @@ export default function LiveFeed({ lastUpdated, showAlert, setPage }) {
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => {
+                {annotatedLogs.map((log) => {
                   const isSelected = selectedLog?.id === log.id;
                   const rowBg = isSelected
                     ? "bg-blue-950/30"
@@ -538,6 +650,25 @@ export default function LiveFeed({ lastUpdated, showAlert, setPage }) {
                       </td>
                       <td className="p-2 text-gray-500 whitespace-nowrap font-mono">{formatTime(log.timestamp)}</td>
                       <td className="p-2 text-gray-500 whitespace-nowrap">{log.source}</td>
+                      <td className="p-2 text-gray-400 max-w-[180px]">
+                        {log.asset ? (
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full border ${ASSET_COLOR[log.asset.asset_type] || "border-gray-700 text-gray-400"} text-[11px]`}>
+                              {ASSET_ICON[log.asset.asset_type] || log.asset.hostname?.[0]?.toUpperCase() || "A"}
+                            </span>
+                            <div className="flex flex-col">
+                              <span className="text-xs text-white font-semibold">
+                                {log.asset.hostname || log.asset.ip_address || `Asset #${log.asset.id}`}
+                              </span>
+                              <span className="text-[10px] text-gray-500">
+                                {log.asset.department || "unknown"} • {log.asset.criticality || "medium"}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-600">n/a</span>
+                        )}
+                      </td>
                       <td className="p-2 whitespace-nowrap">
                         <span className={`px-1.5 py-0.5 rounded border text-xs ${
                           EVENT_BADGE[log.event_type] || "bg-gray-800 border-gray-700 text-gray-500"
@@ -566,9 +697,9 @@ export default function LiveFeed({ lastUpdated, showAlert, setPage }) {
                     </tr>
                   );
                 })}
-                {logs.length === 0 && (
+                {annotatedLogs.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-gray-600">
+                    <td colSpan={9} className="p-8 text-center text-gray-600">
                       No logs match the current filters.
                     </td>
                   </tr>
@@ -579,11 +710,11 @@ export default function LiveFeed({ lastUpdated, showAlert, setPage }) {
         </div>
 
         {/* ── Stats footer ────────────────────────────────────────────── */}
-        {logs.length > 0 && (
+        {annotatedLogs.length > 0 && (
           <div className="flex gap-6 text-xs text-gray-600">
-            <span>Showing <span className="text-gray-400">{logs.length}</span> of <span className="text-gray-400">{total.toLocaleString()}</span></span>
-            <span>Anomalous: <span className="text-red-400">{logs.filter((l) => l.is_anomalous).length}</span></span>
-            <span>Avg risk: <span className="text-gray-400">{Math.round(logs.reduce((s, l) => s + (l.risk_score||0), 0) / logs.length)}</span></span>
+            <span>Showing <span className="text-gray-400">{annotatedLogs.length}</span> of <span className="text-gray-400">{total.toLocaleString()}</span></span>
+            <span>Anomalous: <span className="text-red-400">{annotatedLogs.filter((l) => l.is_anomalous).length}</span></span>
+            <span>Avg risk: <span className="text-gray-400">{Math.round(annotatedLogs.reduce((s, l) => s + (l.risk_score||0), 0) / annotatedLogs.length)}</span></span>
             {selectedLog && <span className="ml-auto text-blue-400">Log #{selectedLog.id} selected</span>}
           </div>
         )}

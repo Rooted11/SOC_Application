@@ -10,7 +10,7 @@ WorkingDirectory=/opt/soc-lab
 
 # Core settings — override in /etc/soc-agent.env
 EnvironmentFile=-/etc/soc-agent.env
-Environment="SOC_ENDPOINT=http://192.168.56.102:8000"
+Environment="SOC_ENDPOINT=http://<SOC_UBUNTU_IP>:8000"
 Environment="SOC_TOKEN=lab-ingest-token"
 Environment="SOC_INTERVAL=10"
 Environment="SOC_BATCH=50"

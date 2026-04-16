@@ -25,7 +25,7 @@ Usage examples:
   python scripts/send_local_logs.py --demo --once
 
   # Custom endpoint and token
-  python scripts/send_local_logs.py --endpoint http://192.168.56.102:8000 --token lab-ingest-token
+  python scripts/send_local_logs.py --endpoint http://<SOC_UBUNTU_IP>:8000 --token lab-ingest-token
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ from urllib import request, error as urlerror
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_ENDPOINT = "http://192.168.56.102:8000/api/logs/ingest"
+DEFAULT_ENDPOINT = "http://<SOC_UBUNTU_IP>:8000/api/logs/ingest"
 DEFAULT_TOKEN = "lab-ingest-token"
 POLL_INTERVAL_SECONDS = 15
 
@@ -380,7 +380,7 @@ def collect_channel(channel: str, last_record: int) -> List[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 DEMO_USERS = ["Administrator", "svc_backup", "jdoe", "analyst01", "SYSTEM", "LOCAL SERVICE"]
-DEMO_IPS = ["192.168.56.101", "192.168.56.1", "10.0.0.15", "172.16.5.22", "203.0.113.50", "198.51.100.7"]
+DEMO_IPS = ["<WIN_HOST_IP>", "<VM_HOST_IP>", "10.0.0.15", "172.16.5.22", "203.0.113.50", "198.51.100.7"]
 
 
 def generate_demo_logs(count: int = 12) -> List[Dict[str, Any]]:
@@ -572,7 +572,7 @@ def main() -> None:
             "Examples:\n"
             "  python send_local_logs.py --once\n"
             "  python send_local_logs.py --demo --once\n"
-            "  python send_local_logs.py --endpoint http://192.168.56.102:8000/api/logs/ingest\n"
+            "  python send_local_logs.py --endpoint http://<SOC_UBUNTU_IP>:8000/api/logs/ingest\n"
         ),
     )
     parser.add_argument(

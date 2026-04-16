@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../services/api";
+import { formatMountainDateTime } from "../utils/time";
 
 export default function AuditLogs({ showAlert }) {
   const [logs, setLogs] = useState([]);
@@ -41,7 +42,7 @@ export default function AuditLogs({ showAlert }) {
               <div key={log.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
                 <div className="flex items-center justify-between text-sm text-slate-200">
                   <span>{log.actor}</span>
-                  <span className="text-xs text-slate-500">{new Date(log.created_at).toLocaleString()}</span>
+                  <span className="text-xs text-slate-500">{formatMountainDateTime(log.created_at)}</span>
                 </div>
                 <div className="text-xs text-slate-400">
                   {log.action} {log.entity_type} {log.entity_id}

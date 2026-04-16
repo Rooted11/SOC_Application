@@ -45,6 +45,8 @@ export default function ThreatTrends({ lastUpdated, showAlert }) {
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filterType, setFilterType] = useState("");
+  const [maintenanceBusy, setMaintenanceBusy] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null); // "old" | "recent" | null
 
   const fetchData = () => {
     setLoading(true);
@@ -72,6 +74,44 @@ export default function ThreatTrends({ lastUpdated, showAlert }) {
       .finally(() => setRefreshing(false));
   };
 
+  const clearOldIndicators = async () => {
+    setMaintenanceBusy(true);
+    try {
+      const result = await api.purgeThreatIntel({ older_than_days: 30 });
+      if (result.deleted === 0) {
+        showAlert("No old indicators to clear", "info");
+      } else {
+        showAlert(`Cleared ${result.deleted} old indicators`, "success");
+      }
+      setConfirmAction(null);
+      fetchData();
+    } catch (e) {
+      showAlert(e.message, "error");
+    } finally {
+      setMaintenanceBusy(false);
+    }
+  };
+
+  const clearRecentIndicators = async () => {
+    setMaintenanceBusy(true);
+    try {
+      const ids = indicators.map((i) => i.id).filter(Boolean);
+      if (ids.length === 0) {
+        showAlert("No recent indicators to clear", "info");
+        setConfirmAction(null);
+        return;
+      }
+      const result = await api.purgeThreatIntel({ indicator_ids: ids });
+      showAlert(`Cleared ${result.deleted} recent indicators`, "success");
+      setConfirmAction(null);
+      fetchData();
+    } catch (e) {
+      showAlert(e.message, "error");
+    } finally {
+      setMaintenanceBusy(false);
+    }
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-64 text-gray-600">Loading threat data…</div>;
   }
@@ -87,14 +127,61 @@ export default function ThreatTrends({ lastUpdated, showAlert }) {
           <h2 className="text-xs uppercase tracking-widest text-gray-500">
             Threat Landscape Summary
           </h2>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="text-xs bg-gray-800 border border-gray-700 text-gray-400 rounded px-3 py-1 hover:border-red-700 hover:text-red-400 disabled:opacity-40"
-          >
-            {refreshing ? "Refreshing…" : "↻ Refresh Feed"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setConfirmAction(confirmAction === "old" ? null : "old")}
+              disabled={maintenanceBusy}
+              className="text-xs bg-yellow-950/25 border border-yellow-700/50 text-yellow-300 rounded px-3 py-1 hover:bg-yellow-950/40 disabled:opacity-40"
+            >
+              Clear Old Data
+            </button>
+            <button
+              onClick={() => setConfirmAction(confirmAction === "recent" ? null : "recent")}
+              disabled={maintenanceBusy}
+              className="text-xs bg-red-950/25 border border-red-700/50 text-red-300 rounded px-3 py-1 hover:bg-red-950/40 disabled:opacity-40"
+            >
+              Clear Recent Indicators
+            </button>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="text-xs bg-gray-800 border border-gray-700 text-gray-400 rounded px-3 py-1 hover:border-red-700 hover:text-red-400 disabled:opacity-40"
+            >
+              {refreshing ? "Refreshing…" : "↻ Refresh Feed"}
+            </button>
+          </div>
         </div>
+
+        {confirmAction && (
+          <div className={`mb-3 flex items-center gap-3 rounded-lg border px-3 py-2 text-xs ${
+            confirmAction === "recent"
+              ? "border-red-700/50 bg-red-950/20 text-red-300"
+              : "border-yellow-700/50 bg-yellow-950/20 text-yellow-300"
+          }`}>
+            <span className="font-medium">
+              {confirmAction === "recent"
+                ? `Delete ${indicators.length} recent indicators currently shown?`
+                : "Delete indicators older than 30 days?"}
+            </span>
+            <button
+              onClick={confirmAction === "recent" ? clearRecentIndicators : clearOldIndicators}
+              disabled={maintenanceBusy}
+              className={`px-3 py-1 rounded font-semibold disabled:opacity-50 ${
+                confirmAction === "recent"
+                  ? "bg-red-700 text-white hover:bg-red-600"
+                  : "bg-yellow-700 text-white hover:bg-yellow-600"
+              }`}
+            >
+              {maintenanceBusy ? "Working..." : "Confirm"}
+            </button>
+            <button
+              onClick={() => setConfirmAction(null)}
+              className="text-slate-300 hover:text-white"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
         <p className="text-sm text-gray-300 leading-relaxed">{data?.narrative}</p>
         <div className="mt-3 flex gap-4 text-xs text-gray-500">
           <span>Total IOCs: <span className="text-gray-300">{data?.total_iocs ?? 0}</span></span>

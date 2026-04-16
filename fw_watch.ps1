@@ -1,4 +1,4 @@
-$dest = "http://192.168.56.101:8000/api/logs/ingest"   # Windows host -> Ubuntu VM; use http://localhost:8000 when running on the VM
+$dest = "http://<WIN_HOST_IP>:8000/api/logs/ingest"   # Windows host -> Ubuntu VM; use http://localhost:8000 when running on the VM
 $hostname = $env:COMPUTERNAME
 $user = $env:USERNAME
 $logPath = "$env:SystemRoot\System32\LogFiles\Firewall\pfirewall.log"

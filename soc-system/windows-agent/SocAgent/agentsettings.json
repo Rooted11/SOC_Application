@@ -1,0 +1,9 @@
+﻿{
+  "ApiEndpoint": "http://<SOC_BACKEND_IP>:8000/logs",
+  "PollingIntervalSeconds": 5,
+  "EnabledEventIds": [4624, 4625, 4740, 4672],
+  "RetryCount": 3,
+  "RetryBackoffSeconds": 2,
+  "LogDirectory": "C:\\ProgramData\\SocAgent\\logs",
+  "AgentToken": ""
+}

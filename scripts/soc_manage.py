@@ -3,7 +3,7 @@
 soc_manage.py -- Ataraxia SOC Remote Management Tool
 =====================================================
 Run from your Windows machine to manage the SOC without SSH.
-Talks directly to the backend API at http://192.168.56.102:8000.
+Talks directly to the backend API at http://<SOC_UBUNTU_IP>:8000.
 
 NOTE: Forces UTF-8 stdout on Windows to handle Unicode from the backend.
 
@@ -41,8 +41,8 @@ if sys.platform == "win32" and not os.environ.get("PYTHONIOENCODING"):
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 # -- Configuration -------------------------------------------------------------
-API_BASE = os.getenv("SOC_API_URL", "http://192.168.56.102:8000")
-VM_HOST = os.getenv("SOC_VM_HOST", "192.168.56.102")
+API_BASE = os.getenv("SOC_API_URL", "http://<SOC_UBUNTU_IP>:8000")
+VM_HOST = os.getenv("SOC_VM_HOST", "<SOC_UBUNTU_IP>")
 VM_USER = os.getenv("SOC_VM_USER", "your-vm-user")
 VM_PASS = os.getenv("SOC_VM_PASS", "your-vm-password")
 AUTH_USER = os.getenv("SOC_AUTH_USER", "soc_operator")
@@ -249,7 +249,7 @@ def cmd_logs(args):
                 "timestamp": now.isoformat(),
                 "log_level": "info",
                 "message": f"Test log entry #{i+1} from soc_manage.py at {now.isoformat()}",
-                "ip_src": "192.168.56.1",
+                "ip_src": "<VM_HOST_IP>",
                 "event_type": "syslog",
                 "user": "test_user",
                 "raw_data": {"host": "windows-host", "tool": "soc_manage.py"},

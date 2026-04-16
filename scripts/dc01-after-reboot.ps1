@@ -3,7 +3,7 @@
 .SYNOPSIS
     Run AFTER DC promotion reboot. Creates users, groups, audit policies,
     and starts the SOC log forwarder.
-    Log in as LAB\Administrator (same password you set during install).
+    Log in as EXAMPLE\Administrator (same password you set during install).
 #>
 
 Write-Host "`n=== SOC Lab - DC01 Post-Promotion Setup ===" -ForegroundColor Cyan
@@ -40,11 +40,11 @@ Write-Host "`n[2/5] Creating groups..." -ForegroundColor Yellow
 
 # ── Create Users ──────────────────────────────────────────────────────
 Write-Host "`n[3/5] Creating users..." -ForegroundColor Yellow
-$pw = ConvertTo-SecureString "SOClab2024!" -AsPlainText -Force
+$pw = ConvertTo-SecureString "<LAB_PASSWORD>" -AsPlainText -Force
 
 $users = @(
-    @{ Sam="soc.admin"; Name="SOC Admin";      OU="SOC Lab Admins"; Groups=@("SOC Admins","Domain Admins") },
-    @{ Sam="it.admin";  Name="IT Admin";       OU="SOC Lab Admins"; Groups=@("IT Operations","Domain Admins") },
+    @{ Sam="soc-admin"; Name="SOC Admin";      OU="SOC Lab Admins"; Groups=@("SOC Admins","Domain Admins") },
+    @{ Sam="it-admin";  Name="IT Admin";       OU="SOC Lab Admins"; Groups=@("IT Operations","Domain Admins") },
     @{ Sam="jsmith";    Name="John Smith";     OU="SOC Lab Users";  Groups=@("SOC Analysts") },
     @{ Sam="agarcia";   Name="Ana Garcia";     OU="SOC Lab Users";  Groups=@("SOC Analysts") },
     @{ Sam="mchen";     Name="Ming Chen";      OU="SOC Lab Users";  Groups=@("SOC Analysts","IT Operations") },
@@ -56,7 +56,7 @@ $users = @(
 foreach ($u in $users) {
     if (-not (Get-ADUser -Filter "SamAccountName -eq '$($u.Sam)'" -ErrorAction SilentlyContinue)) {
         New-ADUser -SamAccountName $u.Sam -Name $u.Name `
-            -UserPrincipalName "$($u.Sam)@lab.local" `
+            -UserPrincipalName "$($u.Sam)@example.local" `
             -Path "OU=$($u.OU),$dn" `
             -AccountPassword $pw -Enabled $true `
             -PasswordNeverExpires $true -ChangePasswordAtLogon $false
@@ -91,29 +91,29 @@ Write-Host "  DNS forwarder: 8.8.8.8" -ForegroundColor Green
 
 # ── Verify SOC connectivity ───────────────────────────────────────────
 Write-Host "`n=== Connectivity Check ===" -ForegroundColor Cyan
-$socReach = Test-Connection -ComputerName 192.168.56.102 -Count 2 -Quiet -ErrorAction SilentlyContinue
+$socReach = Test-Connection -ComputerName <SOC_UBUNTU_IP> -Count 2 -Quiet -ErrorAction SilentlyContinue
 if ($socReach) {
-    Write-Host "  SOC (192.168.56.102): REACHABLE" -ForegroundColor Green
+    Write-Host "  SOC (<SOC_UBUNTU_IP>): REACHABLE" -ForegroundColor Green
     # Test the API
     try {
-        $r = Invoke-RestMethod -Uri "http://192.168.56.102:8000/api/system/health" -TimeoutSec 5
+        $r = Invoke-RestMethod -Uri "http://<SOC_UBUNTU_IP>:8000/api/system/health" -TimeoutSec 5
         Write-Host "  SOC API: ONLINE (Redis: $($r.redis))" -ForegroundColor Green
     } catch {
         Write-Host "  SOC API: NOT RESPONDING (may need to check backend)" -ForegroundColor Yellow
     }
 } else {
-    Write-Host "  SOC (192.168.56.102): UNREACHABLE - check network adapter" -ForegroundColor Red
+    Write-Host "  SOC (<SOC_UBUNTU_IP>): UNREACHABLE - check network adapter" -ForegroundColor Red
 }
 
 # ── Summary ───────────────────────────────────────────────────────────
 Write-Host "`n=== Setup Complete ===" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  Domain:       lab.local"
-Write-Host "  DC:           DC01.lab.local (192.168.56.10)"
-Write-Host "  Admin users:  LAB\soc.admin, LAB\it.admin"
-Write-Host "  Analysts:     LAB\jsmith, LAB\agarcia, LAB\mchen"
-Write-Host "  Test users:   LAB\bwilson, LAB\ljones"
-Write-Host "  Password:     SOClab2024!"
+Write-Host "  Domain:       example.local"
+Write-Host "  DC:           DC01.example.local (<DC01_IP>)"
+Write-Host "  Admin users:  EXAMPLE\soc-admin, EXAMPLE\it-admin"
+Write-Host "  Analysts:     EXAMPLE\jsmith, EXAMPLE\agarcia, EXAMPLE\mchen"
+Write-Host "  Test users:   EXAMPLE\bwilson, EXAMPLE\ljones"
+Write-Host "  Password:     <LAB_PASSWORD>"
 Write-Host ""
 Write-Host "  Next: Run the SOC forwarder to start sending events:" -ForegroundColor Yellow
 Write-Host '  .\dc01-soc-forwarder.ps1' -ForegroundColor White

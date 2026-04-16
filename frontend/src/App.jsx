@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import CommandCenter from "./components/CommandCenter";
 import Dashboard from "./components/Dashboard";
 import IncidentList from "./components/IncidentList";
@@ -16,6 +16,7 @@ import SettingsPage from "./components/SettingsPage";
 import SystemHealth from "./components/SystemHealth";
 import AuditLogs from "./components/AuditLogs";
 import Alarms from "./components/Alarms";
+import HelpCenter from "./components/HelpCenter";
 import { api, authStorage } from "./services/api";
 
 /* ── Navigation map ────────────────────────────────────────────────────── */
@@ -59,10 +60,100 @@ const NAV_GROUPS = [
       { id: "alarms", label: "Alarms", short: "ALM", icon: "\u23F0" },
       { id: "health", label: "System Health", short: "HLT", icon: "\u2665" },
       { id: "audit", label: "Audit Logs", short: "AUD", icon: "\u2637" },
+      { id: "help", label: "Help", short: "HLP", icon: "?" },
     ],
   },
 ];
 const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
+const PAGE_HELP = {
+  command: "Control automation, playbooks, and quick investigations from one curated panel.",
+  dashboard: "Review risk trends, anomaly scoring, and top insights before triaging.",
+  incidents: "Prioritize open incidents, adjust severity, and dispatch response teams.",
+  advisor: "Ask the AI analyst for recommendations and incident summaries.",
+  feed: "Tail the live log stream to confirm what is hitting the pipeline right now.",
+  threats: "Investigate IOC hits, threat feeds, and correlations with your environment.",
+  assets: "See the current inventory, exposure warnings, and asset ownership notes.",
+  detections: "Tune detection rules, thresholds, and suppression policies with confidence.",
+  playbooks: "Build and simulate automated response steps for repeatable incidents.",
+  integrations: "Wire in alerting, ticketing, and automation partners for faster action.",
+  notifications: "Fine-tune notification channels so the right people hear about alerts.",
+  users: "Manage roles, MFA, and access scopes for your SOC crew.",
+  settings: "Adjust global configurations, secrets, and feature flags safely.",
+  alarms: "Acknowledge and investigate alarms that need operator attention.",
+  health: "Check the health of services, queues, and containerized workloads.",
+  audit: "Review the latest operator actions, config changes, and system events.",
+  help: "Learn operator workflows, troubleshooting steps, and quick navigation paths.",
+};
+const PAGE_TIPS = {
+  command: [
+    "Kick off weekly playbooks when new critical incidents appear.",
+    "Check the live feed link if a quick log sweep is needed."
+  ],
+  dashboard: [
+    "Use the timeline visuals to confirm that anomaly scoring matches your expectations.",
+    "Open an incident directly from the Risk Trends chart for faster response."
+  ],
+  incidents: [
+    "Sort by risk score to focus on the highest-impact tickets first.",
+    "Click Playbooks to trigger containment directly from high-priority cases."
+  ],
+  advisor: [
+    "Pick a quick prompt to let Claude outline a containment plan in seconds.",
+    "Type a question to dive into the incident's narrative or gaps."
+  ],
+  feed: [
+    "Filter by log level to surface alerts that match your current hunt.",
+    "Pin the live feed to another screen for continuous visibility."
+  ],
+  threats: [
+    "Use IOC history to decide if you need to update block lists.",
+    "Correlate threat intelligence with open incidents for faster attribution."
+  ],
+  assets: [
+    "Flag critical assets that need extra monitoring or isolation.",
+    "Review ownership notes before escalating to system owners."
+  ],
+  detections: [
+    "Adjust thresholds conservatively—run tests before applying to production.",
+    "Suppress noisy sources for the next 24h if they are already under investigation."
+  ],
+  playbooks: [
+    "Sequence commonly used steps into a single, repeatable playbook.",
+    "Attach Slack/PagerDuty notifications to the response actions you want to trigger."
+  ],
+  integrations: [
+    "Double-check webhook URLs before enabling a new connector.",
+    "Use the test button to confirm alerts are reaching the external system."
+  ],
+  notifications: [
+    "Group contacts (pager, email, Slack) by shift coverage to avoid missed alerts.",
+    "Use escalation rules for critical incidents to notify multiple teams sequentially."
+  ],
+  users: [
+    "Enable MFA for the SOC leads and analysts.",
+    "Audit role permissions monthly to keep least-privilege policies tight."
+  ],
+  settings: [
+    "Review `ANTHROPIC_API_KEY` and toggle AI assists as needed.",
+    "Update rate limits to match your concentrated testing windows."
+  ],
+  alarms: [
+    "Acknowledge alarms you are already investigating to clear the badge.",
+    "Create a temporary alert rule when drilling down on a specific sensor."
+  ],
+  health: [
+    "Restart flaky containers directly from the System Health view.",
+    "Use the Redis/DB health indicators to know when to scale resources."
+  ],
+  audit: [
+    "Filter by operator to trace who acknowledged or resolved incidents.",
+    "Export logs when you need to brief compliance teams."
+  ],
+  help: [
+    "Use this guide as the first stop when behavior feels inconsistent across modules.",
+    "Open Incident Queue, Threat Intel, or Live Feed directly from quick links."
+  ],
+};
 
 /* ── Notification toast stack ──────────────────────────────────────────── */
 
@@ -143,6 +234,7 @@ export default function App() {
     NAV_GROUPS.reduce((acc, g) => ({ ...acc, [g.title]: true }), {})
   );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [navQuery, setNavQuery] = useState("");
 
   // Live counters for badges
   const [alarmCount, setAlarmCount] = useState(0);
@@ -158,6 +250,38 @@ export default function App() {
   const dismissToast = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
+
+  const handleNavSuggestionSelect = useCallback(
+    (id) => {
+      setPage(id);
+      setNavQuery("");
+    },
+    [setPage, setNavQuery]
+  );
+
+  const navMatches = useMemo(() => {
+    const query = navQuery.trim().toLowerCase();
+    if (!query) return [];
+    return NAV_ITEMS.filter(
+      (item) =>
+        item.label.toLowerCase().includes(query) ||
+        item.short.toLowerCase().includes(query)
+    ).slice(0, 4);
+  }, [navQuery]);
+
+  const pageDescription = useMemo(
+    () => PAGE_HELP[page] || "This view keeps you ahead of incidents and alerts.",
+    [page]
+  );
+
+  const handleNavInputKeyDown = useCallback(
+    (event) => {
+      if (event.key === "Enter" && navMatches.length > 0) {
+        handleNavSuggestionSelect(navMatches[0].id);
+      }
+    },
+    [navMatches, handleNavSuggestionSelect]
+  );
 
   // Fetch live badge counts
   const fetchCounts = useCallback(async () => {
@@ -458,73 +582,130 @@ export default function App() {
         <div className="flex min-w-0 flex-col">
           {/* Header */}
           <header className="border-b border-cyan-500/10 bg-slate-950/60 backdrop-blur-xl">
-            <div className="flex items-center justify-between px-6 py-4">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.35em] text-slate-500">
-                  Security Operations Center
+            <div className="flex flex-col gap-3 px-6 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.35em] text-slate-500">
+                    Security Operations Center
+                  </div>
+                  <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">
+                    {currentLabel}
+                  </h1>
                 </div>
-                <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">
-                  {currentLabel}
-                </h1>
+
+                <div className="flex items-center gap-2">
+                  {criticalCount > 0 && (
+                    <button
+                      onClick={() => setPage("incidents")}
+                      className="flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-950/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/80 transition-colors animate-pulse"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-red-500" />
+                      {criticalCount} Critical
+                    </button>
+                  )}
+                  {incidentCount > 0 && (
+                    <button
+                      onClick={() => setPage("incidents")}
+                      className="flex items-center gap-1.5 rounded-full border border-orange-500/30 bg-orange-950/40 px-3 py-1.5 text-xs text-orange-400 hover:bg-orange-950/60 transition-colors"
+                    >
+                      {incidentCount} Open
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => setPage("alarms")}
+                    className={`relative rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                      alarmCount > 0
+                        ? "border-amber-500/40 bg-amber-950/50 text-amber-400 hover:bg-amber-950/70"
+                        : "border-slate-700 bg-slate-900/70 text-slate-400 hover:border-slate-600"
+                    }`}
+                  >
+                    <span className="mr-1">{"\u23F0"}</span>
+                    {alarmCount > 0 ? `${alarmCount} Alarms` : "Alarms"}
+                    {alarmCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-500 animate-ping opacity-75" />
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setPage("feed")}
+                    className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-400 hover:border-cyan-500/40 hover:text-cyan-400 transition-colors"
+                  >
+                    Live Feed
+                  </button>
+
+                  <button
+                    onClick={() => setPage("help")}
+                    className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-400 hover:border-cyan-500/40 hover:text-cyan-400 transition-colors"
+                  >
+                    Help
+                  </button>
+
+                  {authEnabled && (
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-400 transition hover:border-slate-700 hover:text-white"
+                    >
+                      Sign out
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                {/* Live status badges */}
-                {criticalCount > 0 && (
-                  <button
-                    onClick={() => setPage("incidents")}
-                    className="flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-950/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/80 transition-colors animate-pulse"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-red-500" />
-                    {criticalCount} Critical
-                  </button>
-                )}
-                {incidentCount > 0 && (
-                  <button
-                    onClick={() => setPage("incidents")}
-                    className="flex items-center gap-1.5 rounded-full border border-orange-500/30 bg-orange-950/40 px-3 py-1.5 text-xs text-orange-400 hover:bg-orange-950/60 transition-colors"
-                  >
-                    {incidentCount} Open
-                  </button>
-                )}
-
-                {/* Alarm bell */}
-                <button
-                  onClick={() => setPage("alarms")}
-                  className={`relative rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                    alarmCount > 0
-                      ? "border-amber-500/40 bg-amber-950/50 text-amber-400 hover:bg-amber-950/70"
-                      : "border-slate-700 bg-slate-900/70 text-slate-400 hover:border-slate-600"
-                  }`}
-                >
-                  <span className="mr-1">{"\u23F0"}</span>
-                  {alarmCount > 0 ? `${alarmCount} Alarms` : "Alarms"}
-                  {alarmCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-500 animate-ping opacity-75" />
-                  )}
-                </button>
-
-                {/* Quick nav */}
-                <button
-                  onClick={() => setPage("feed")}
-                  className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-400 hover:border-cyan-500/40 hover:text-cyan-400 transition-colors"
-                >
-                  Live Feed
-                </button>
-
-                {authEnabled && (
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-400 transition hover:border-slate-700 hover:text-white"
-                  >
-                    Sign out
-                  </button>
-                )}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex-1 min-w-[240px]">
+                  <label className="text-[10px] uppercase tracking-[0.25em] text-slate-500">
+                    Jump to section
+                  </label>
+                  <div className="relative mt-1">
+                    <input
+                      type="text"
+                      value={navQuery}
+                      onChange={(event) => setNavQuery(event.target.value)}
+                      onKeyDown={handleNavInputKeyDown}
+                      placeholder="Search for analytics, incidents, playbooks..."
+                      className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-600/40"
+                    />
+                    {navMatches.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full z-20 mt-2 rounded-2xl border border-slate-800 bg-slate-950/95 py-2 shadow-2xl backdrop-blur">
+                        {navMatches.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => handleNavSuggestionSelect(item.id)}
+                            className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-slate-100 hover:bg-slate-900/70"
+                          >
+                            <span className="text-cyan-400">{item.icon}</span>
+                            <div className="flex flex-col">
+                              <span className="font-semibold">{item.label}</span>
+                              <span className="text-xs text-slate-500">{item.short}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="text-xs text-slate-400">
+                  Type a name, abbreviation, or badge label and press Enter to jump.
+                </div>
               </div>
             </div>
           </header>
 
+          <div className="border-b border-slate-800 bg-slate-950/40 px-6 py-3 text-sm text-slate-300">
+            <div>{pageDescription}</div>
+            {PAGE_TIPS[page] && (
+              <div className="mt-2 grid gap-1 text-[13px] text-slate-400">
+                {PAGE_TIPS[page].map((tip) => (
+                  <div key={tip} className="flex items-start gap-2">
+                    <span className="text-cyan-400 font-semibold">•</span>
+                    <span className="leading-tight">{tip}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           {/* Page content */}
           <main className="min-w-0 flex-1 overflow-auto px-6 py-6">
             {page === "command" && <CommandCenter lastUpdated={lastUpdated} showAlert={showAlert} setPage={setPage} />}
@@ -543,6 +724,7 @@ export default function App() {
             {page === "health" && <SystemHealth lastUpdated={lastUpdated} showAlert={showAlert} />}
             {page === "alarms" && <Alarms lastUpdated={lastUpdated} showAlert={showAlert} />}
             {page === "audit" && <AuditLogs showAlert={showAlert} />}
+            {page === "help" && <HelpCenter setPage={setPage} />}
           </main>
         </div>
       </div>

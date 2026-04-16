@@ -16,7 +16,7 @@ Features
 
 Environment variables
 ---------------------
-SOC_ENDPOINT    Backend URL             default: http://192.168.56.102:8000
+SOC_ENDPOINT    Backend URL             default: http://<SOC_UBUNTU_IP>:8000
 SOC_TOKEN       Ingest token            default: lab-ingest-token
 SOC_INTERVAL    Poll interval (secs)    default: 10
 SOC_BATCH       Max logs per batch      default: 50
@@ -46,7 +46,7 @@ from urllib.error import HTTPError, URLError
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-DEFAULT_ENDPOINT = os.getenv("SOC_ENDPOINT",   "http://192.168.56.102:8000")
+DEFAULT_ENDPOINT = os.getenv("SOC_ENDPOINT",   "http://<SOC_UBUNTU_IP>:8000")
 DEFAULT_TOKEN    = os.getenv("SOC_TOKEN",      "lab-ingest-token")
 DEFAULT_INTERVAL = int(os.getenv("SOC_INTERVAL",  "10"))
 DEFAULT_BATCH    = int(os.getenv("SOC_BATCH",     "50"))

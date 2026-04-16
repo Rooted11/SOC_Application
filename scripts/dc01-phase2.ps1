@@ -3,7 +3,7 @@
 .SYNOPSIS
     Phase 2: Create OUs, users, and groups in Active Directory.
     Run this AFTER the server has rebooted as a Domain Controller.
-    Log in as LAB\Administrator.
+    Log in as EXAMPLE\Administrator.
 
 .DESCRIPTION
     - Creates organizational units
@@ -75,51 +75,51 @@ foreach ($grp in $groups) {
 # ── Step 3: Create Users ────────────────────────────────────────────
 Write-Host "`n[3/5] Creating Users..." -ForegroundColor Yellow
 
-$defaultPass = ConvertTo-SecureString "SOClab2024!" -AsPlainText -Force
+$defaultPass = ConvertTo-SecureString "<LAB_PASSWORD>" -AsPlainText -Force
 
 $users = @(
     # Admin accounts
     @{
-        Sam = "soc.admin";   First = "SOC";     Last = "Admin"
-        UPN = "soc.admin@lab.local"; Title = "SOC Administrator"
+        Sam = "soc-admin";   First = "SOC";     Last = "Admin"
+        UPN = "soc-admin@example.local"; Title = "SOC Administrator"
         Path = "OU=SOC Lab Admins,$domain"; Groups = @("SOC Admins", "Domain Admins")
     },
     @{
-        Sam = "it.admin";    First = "IT";      Last = "Admin"
-        UPN = "it.admin@lab.local"; Title = "IT Administrator"
+        Sam = "it-admin";    First = "IT";      Last = "Admin"
+        UPN = "it-admin@example.local"; Title = "IT Administrator"
         Path = "OU=SOC Lab Admins,$domain"; Groups = @("IT Operations", "Domain Admins")
     },
     # Analyst accounts
     @{
         Sam = "jsmith";      First = "John";    Last = "Smith"
-        UPN = "jsmith@lab.local"; Title = "SOC Analyst"
+        UPN = "jsmith@example.local"; Title = "SOC Analyst"
         Path = "OU=SOC Lab Users,$domain"; Groups = @("SOC Analysts")
     },
     @{
         Sam = "agarcia";     First = "Ana";     Last = "Garcia"
-        UPN = "agarcia@lab.local"; Title = "Senior SOC Analyst"
+        UPN = "agarcia@example.local"; Title = "Senior SOC Analyst"
         Path = "OU=SOC Lab Users,$domain"; Groups = @("SOC Analysts")
     },
     @{
         Sam = "mchen";       First = "Ming";    Last = "Chen"
-        UPN = "mchen@lab.local"; Title = "Threat Hunter"
+        UPN = "mchen@example.local"; Title = "Threat Hunter"
         Path = "OU=SOC Lab Users,$domain"; Groups = @("SOC Analysts", "IT Operations")
     },
     # Standard users (attack simulation targets)
     @{
         Sam = "bwilson";     First = "Bob";     Last = "Wilson"
-        UPN = "bwilson@lab.local"; Title = "Developer"
+        UPN = "bwilson@example.local"; Title = "Developer"
         Path = "OU=SOC Lab Users,$domain"; Groups = @("Developers")
     },
     @{
         Sam = "ljones";      First = "Lisa";    Last = "Jones"
-        UPN = "ljones@lab.local"; Title = "HR Manager"
+        UPN = "ljones@example.local"; Title = "HR Manager"
         Path = "OU=SOC Lab Users,$domain"; Groups = @()
     },
     # Service account
     @{
         Sam = "svc.soc";     First = "SOC";     Last = "Service"
-        UPN = "svc.soc@lab.local"; Title = "SOC Service Account"
+        UPN = "svc.soc@example.local"; Title = "SOC Service Account"
         Path = "OU=Service Accounts,$domain"; Groups = @()
     }
 )
@@ -191,23 +191,23 @@ Write-Host "  DNS forwarder added (8.8.8.8)" -ForegroundColor Green
 # ── Summary ──────────────────────────────────────────────────────────
 Write-Host "`n=== Phase 2 Complete ===" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Domain:     lab.local" -ForegroundColor White
-Write-Host "DC:         DC01.lab.local (192.168.56.10)" -ForegroundColor White
+Write-Host "Domain:     example.local" -ForegroundColor White
+Write-Host "DC:         DC01.example.local (<DC01_IP>)" -ForegroundColor White
 Write-Host ""
-Write-Host "Admin accounts (password: SOClab2024!):" -ForegroundColor Yellow
-Write-Host "  LAB\soc.admin   - SOC Administrator (Domain Admin)"
-Write-Host "  LAB\it.admin    - IT Administrator (Domain Admin)"
+Write-Host "Admin accounts (password: <LAB_PASSWORD>):" -ForegroundColor Yellow
+Write-Host "  EXAMPLE\soc-admin   - SOC Administrator (Domain Admin)"
+Write-Host "  EXAMPLE\it-admin    - IT Administrator (Domain Admin)"
 Write-Host ""
 Write-Host "Analyst accounts:" -ForegroundColor Yellow
-Write-Host "  LAB\jsmith      - SOC Analyst"
-Write-Host "  LAB\agarcia     - Senior SOC Analyst"
-Write-Host "  LAB\mchen       - Threat Hunter"
+Write-Host "  EXAMPLE\jsmith      - SOC Analyst"
+Write-Host "  EXAMPLE\agarcia     - Senior SOC Analyst"
+Write-Host "  EXAMPLE\mchen       - Threat Hunter"
 Write-Host ""
 Write-Host "Standard accounts (attack sim targets):" -ForegroundColor Yellow
-Write-Host "  LAB\bwilson     - Developer"
-Write-Host "  LAB\ljones      - HR Manager"
+Write-Host "  EXAMPLE\bwilson     - Developer"
+Write-Host "  EXAMPLE\ljones      - HR Manager"
 Write-Host ""
 Write-Host "Service account:" -ForegroundColor Yellow
-Write-Host "  LAB\svc.soc     - SOC Service Account"
+Write-Host "  EXAMPLE\svc.soc     - SOC Service Account"
 Write-Host ""
 Write-Host "Next step: Copy and run dc01-soc-forwarder.ps1 to start sending logs to the SOC" -ForegroundColor Cyan

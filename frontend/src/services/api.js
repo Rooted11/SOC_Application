@@ -6,10 +6,10 @@
  * reachable base URL can still be supplied via VITE_API_URL when needed.
  *
  * If you build/preview the app on Windows (without the Vite proxy), set
- * VITE_API_URL=http://192.168.56.101:8000 so requests hit the Ubuntu backend.
+ * VITE_API_URL=http://<WIN_HOST_IP>:8000 so requests hit the Ubuntu backend.
  */
 
-// VITE_API_BASE_URL = backend origin, e.g. http://192.168.56.102:8000
+// VITE_API_BASE_URL = backend origin, e.g. http://<SOC_UBUNTU_IP>:8000
 // All request paths already include /api/... so we just prepend the origin.
 const ORIGIN = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 const TOKEN_KEY = "obsidian-nexus-access-token";
@@ -162,6 +162,12 @@ export const api = {
 
   refreshThreatFeed: () =>
     request("/api/threat-intel/refresh", { method: "POST" }),
+
+  purgeThreatIntel: (payload) =>
+    request("/api/threat-intel", {
+      method: "DELETE",
+      body: JSON.stringify(payload),
+    }),
 
   getAssets: () => request("/api/assets"),
   createAsset: (payload) =>

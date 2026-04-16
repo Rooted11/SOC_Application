@@ -28,7 +28,7 @@ def _default_backend_url() -> str:
     if env:
         return env.rstrip("/")
     is_windows = platform.system().lower().startswith("win")
-    return "http://192.168.56.101:8000" if is_windows else "http://localhost:8000"
+    return "http://<WIN_HOST_IP>:8000" if is_windows else "http://localhost:8000"
 
 
 BACKEND_URL = _default_backend_url()

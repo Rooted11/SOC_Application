@@ -9,7 +9,7 @@ Usage:
     python scripts/simulate_logs.py [--url URL] [--interval SECONDS] [--count N]
 
 Options:
-    --url       Backend API URL (default: 192.168.56.101 on Windows, localhost on Ubuntu)
+    --url       Backend API URL (default: <WIN_HOST_IP> on Windows, localhost on Ubuntu)
     --interval  Seconds between batches (default: 5)
     --count     Logs per batch (default: 3)
     --once      Send one batch then exit (useful for seeding)
@@ -34,7 +34,7 @@ def _default_backend_url() -> str:
     if env:
         return env.rstrip("/")
     is_windows = platform.system().lower().startswith("win")
-    return "http://192.168.56.101:8000" if is_windows else "http://localhost:8000"
+    return "http://<WIN_HOST_IP>:8000" if is_windows else "http://localhost:8000"
 
 # ── Event catalogue ──────────────────────────────────────────────────────────
 
@@ -56,7 +56,7 @@ ATTACK_EVENTS = [
     {"source": "endpoint", "log_level": "error",    "event_type": "data_exfiltration",   "message": "Large data transfer to external IP {ip}"},
 ]
 
-INTERNAL_IPS  = ["10.0.1.10","10.0.1.20","10.0.1.30","10.0.2.42","10.0.1.5","10.0.2.15"]
+INTERNAL_IPS  = ["10.0.1.10","10.0.1.20","10.0.1.30","10.0.2.42","10.0.1.5","<SOC_BACKEND_IP>"]
 EXTERNAL_IPS  = ["185.220.101.55","203.0.113.88","198.51.100.200","91.108.4.200","45.142.212.100"]
 USERS         = ["jsmith","jdoe","admin","svc_backup","svc_monitor","krbtgt","www-data","root"]
 SERVICES      = ["nginx","postgresql","sshd","cron","docker","systemd-resolved"]

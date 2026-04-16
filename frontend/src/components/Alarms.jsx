@@ -7,6 +7,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../services/api";
 
+const DEFAULT_ALARM_SOURCE = "nassenjoshua@gmail.com";
+
 const SEV = {
   critical: {
     border: "border-red-500/40",
@@ -67,7 +69,7 @@ export default function Alarms({ lastUpdated, showAlert }) {
   const [expanded, setExpanded] = useState(null);
   const [filterSev, setFilterSev] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-  const [form, setForm] = useState({ source: "", message: "", severity: "medium" });
+  const [form, setForm] = useState({ source: DEFAULT_ALARM_SOURCE, message: "", severity: "medium" });
   const [showForm, setShowForm] = useState(false);
 
   const refresh = useCallback(async (silent = false) => {
@@ -94,7 +96,7 @@ export default function Alarms({ lastUpdated, showAlert }) {
     e.preventDefault();
     try {
       await api.createAlarm(form);
-      setForm({ source: "", message: "", severity: "medium" });
+      setForm({ source: DEFAULT_ALARM_SOURCE, message: "", severity: "medium" });
       setShowForm(false);
       showAlert?.("Alarm created", "success");
       refresh();
@@ -230,7 +232,7 @@ export default function Alarms({ lastUpdated, showAlert }) {
           <div className="grid gap-3 sm:grid-cols-3">
             <input
               className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:border-cyan-500/50 focus:outline-none"
-              placeholder="Source (e.g. firewall, IDS, manual)"
+              placeholder="Source (default: nassenjoshua@gmail.com)"
               value={form.source}
               onChange={(e) => setForm({ ...form, source: e.target.value })}
               required

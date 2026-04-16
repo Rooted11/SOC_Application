@@ -30,11 +30,11 @@ services:
       AUTH_USERNAME: ${AUTH_USERNAME:-demo}
       AUTH_PASSWORD: ${AUTH_PASSWORD:-demo123}
       AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:-demo-secret-key-change-me}
-      CORS_ORIGINS: http://localhost:3000,http://192.168.56.101:3000,http://192.168.56.102:3000
-      ALLOWED_HOSTS: localhost,127.0.0.1,192.168.56.101,192.168.56.102,testserver,backend
+      CORS_ORIGINS: http://localhost:3000,http://<WIN_HOST_IP>:3000,http://<SOC_UBUNTU_IP>:3000
+      ALLOWED_HOSTS: localhost,127.0.0.1,<WIN_HOST_IP>,<SOC_UBUNTU_IP>,testserver,backend
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
       PRIMARY_ASSET_HOSTNAME: ${PRIMARY_ASSET_HOSTNAME:-soc-ubuntu}
-      PRIMARY_ASSET_IP: ${PRIMARY_ASSET_IP:-192.168.56.102}
+      PRIMARY_ASSET_IP: ${PRIMARY_ASSET_IP:-<SOC_UBUNTU_IP>}
       INGEST_TOKEN: ${INGEST_TOKEN:-lab-ingest-token}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-3-haiku}
       AI_AUTO_ENABLED: ${AI_AUTO_ENABLED:-false}
@@ -86,11 +86,11 @@ services:
       AUTH_USERNAME: ${AUTH_USERNAME:-demo}
       AUTH_PASSWORD: ${AUTH_PASSWORD:-demo123}
       AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:-demo-secret-key-change-me}
-      CORS_ORIGINS: http://localhost:3000,http://192.168.56.101:3000,http://192.168.56.102:3000
-      ALLOWED_HOSTS: localhost,127.0.0.1,192.168.56.101,192.168.56.102,testserver,backend
+      CORS_ORIGINS: http://localhost:3000,http://<WIN_HOST_IP>:3000,http://<SOC_UBUNTU_IP>:3000
+      ALLOWED_HOSTS: localhost,127.0.0.1,<WIN_HOST_IP>,<SOC_UBUNTU_IP>,testserver,backend
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
       PRIMARY_ASSET_HOSTNAME: ${PRIMARY_ASSET_HOSTNAME:-soc-ubuntu}
-      PRIMARY_ASSET_IP: ${PRIMARY_ASSET_IP:-192.168.56.102}
+      PRIMARY_ASSET_IP: ${PRIMARY_ASSET_IP:-<SOC_UBUNTU_IP>}
       INGEST_TOKEN: ${INGEST_TOKEN:-lab-ingest-token}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-3-haiku}
       AI_AUTO_ENABLED: ${AI_AUTO_ENABLED:-false}

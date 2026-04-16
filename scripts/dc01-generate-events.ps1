@@ -43,7 +43,7 @@ if ($All -or $BruteForce) {
     # Generate 10 failed login attempts with wrong password
     for ($i = 1; $i -le 10; $i++) {
         $wrongPass = ConvertTo-SecureString "WrongPass$i!" -AsPlainText -Force
-        $cred = New-Object System.Management.Automation.PSCredential("LAB\$testUser", $wrongPass)
+        $cred = New-Object System.Management.Automation.PSCredential("EXAMPLE\$testUser", $wrongPass)
         try {
             Start-Process -FilePath "cmd.exe" -ArgumentList "/c echo test" -Credential $cred -ErrorAction SilentlyContinue -WindowStyle Hidden
         } catch { }
@@ -53,7 +53,7 @@ if ($All -or $BruteForce) {
 
     # Now succeed (will generate 4624 after 4625 flood -> brute force detection)
     try {
-        $goodCred = New-Object System.Management.Automation.PSCredential("LAB\$testUser", $testPass)
+        $goodCred = New-Object System.Management.Automation.PSCredential("EXAMPLE\$testUser", $testPass)
         Start-Process -FilePath "cmd.exe" -ArgumentList "/c echo success" -Credential $goodCred -ErrorAction SilentlyContinue -WindowStyle Hidden
         Write-Host "  Successful login after brute force" -ForegroundColor Green
     } catch { }
@@ -164,7 +164,7 @@ if ($All -or $Recon) {
     Invoke-Expression "whoami /all" | Out-Null
     Invoke-Expression "net user /domain" | Out-Null
     Invoke-Expression "net group 'Domain Admins' /domain" | Out-Null
-    Invoke-Expression "nltest /dclist:lab.local" | Out-Null
+    Invoke-Expression "nltest /dclist:example.local" | Out-Null
 
     Write-Host "  -> Should generate: AD enumeration and process creation events" -ForegroundColor Cyan
 }
@@ -191,4 +191,4 @@ try {
 
 Write-Host "`n=== Event Generation Complete ===" -ForegroundColor Cyan
 Write-Host "If the SOC forwarder is running, these events should appear in the dashboard within 30 seconds."
-Write-Host "Check: http://192.168.56.102:3000 -> Live Feed (filter source: dc01.lab.local)`n"
+Write-Host "Check: http://<SOC_UBUNTU_IP>:3000 -> Live Feed (filter source: dc01.example.local)`n"

@@ -7,7 +7,7 @@ const proxyTarget =
   process.env.VITE_API_BASE_URL ||
   process.env.BACKEND_URL ||
   process.env.VITE_BACKEND_URL ||
-  (process.platform === "win32" ? "http://192.168.56.102:8000" : "http://localhost:8000");
+  (process.platform === "win32" ? "http://<SOC_UBUNTU_IP>:8000" : "http://localhost:8000");
 
 export default defineConfig({
   plugins: [react()],
@@ -15,7 +15,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       "/api": {
-        // Docker: "http://backend:8000" | Windows host: "http://192.168.56.101:8000" | Ubuntu host: "http://localhost:8000"
+        // Docker: "http://backend:8000" | Windows host: "http://<WIN_HOST_IP>:8000" | Ubuntu host: "http://localhost:8000"
         target: proxyTarget,
         changeOrigin: true,
       },

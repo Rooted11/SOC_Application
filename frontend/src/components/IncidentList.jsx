@@ -76,6 +76,8 @@ export default function IncidentList({ lastUpdated, showAlert }) {
   const [filterStatus,  setFilterStatus]  = useState("open");
   const [filterSev,     setFilterSev]     = useState("");
   const [page,          setPage]          = useState(0);
+  const [maintenanceBusy, setMaintenanceBusy] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null); // "archive" | "clear" | null
   const limit = 20;
 
   const fetchIncidents = useCallback(() => {
@@ -130,6 +132,37 @@ export default function IncidentList({ lastUpdated, showAlert }) {
 
   const critCount = incidents.filter((i) => i.severity === "critical").length;
 
+  const runArchive = async () => {
+    setMaintenanceBusy(true);
+    try {
+      const result = await api.archiveLogs();
+      if (result.archived === 0) {
+        showAlert(result.message || "No logs eligible for archive", "info");
+      } else {
+        showAlert(`Archived ${result.archived} logs and purged from DB`, "success");
+      }
+      setConfirmAction(null);
+    } catch (e) {
+      showAlert(e.message, "error");
+    } finally {
+      setMaintenanceBusy(false);
+    }
+  };
+
+  const runClearAll = async () => {
+    setMaintenanceBusy(true);
+    try {
+      const result = await api.deleteLogsBulk({ all: true });
+      showAlert(`Deleted ${result.deleted_logs} logs`, "success");
+      setConfirmAction(null);
+      fetchIncidents();
+    } catch (e) {
+      showAlert(e.message, "error");
+    } finally {
+      setMaintenanceBusy(false);
+    }
+  };
+
   return (
     <div className="flex gap-4 h-full">
       {/* ── Left panel ──────────────────────────────────────────────────── */}
@@ -180,6 +213,22 @@ export default function IncidentList({ lastUpdated, showAlert }) {
             ))}
           </select>
 
+          <button
+            onClick={() => setConfirmAction(confirmAction === "archive" ? null : "archive")}
+            disabled={maintenanceBusy}
+            className="text-xs px-3 py-1.5 rounded-xl border border-yellow-700/50 bg-yellow-950/25 text-yellow-300 hover:bg-yellow-950/40 disabled:opacity-40"
+          >
+            Archive & Purge
+          </button>
+
+          <button
+            onClick={() => setConfirmAction(confirmAction === "clear" ? null : "clear")}
+            disabled={maintenanceBusy}
+            className="text-xs px-3 py-1.5 rounded-xl border border-red-700/50 bg-red-950/25 text-red-300 hover:bg-red-950/40 disabled:opacity-40"
+          >
+            Clear All Logs
+          </button>
+
           {/* Counts */}
           <div className="ml-auto flex items-center gap-3 text-xs text-slate-500 self-center">
             {critCount > 0 && (
@@ -191,6 +240,37 @@ export default function IncidentList({ lastUpdated, showAlert }) {
             <span>{total} total</span>
           </div>
         </div>
+
+        {confirmAction && (
+          <div className={`mb-3 flex items-center gap-3 rounded-xl border px-3 py-2 text-xs ${
+            confirmAction === "clear"
+              ? "border-red-700/50 bg-red-950/20 text-red-300"
+              : "border-yellow-700/50 bg-yellow-950/20 text-yellow-300"
+          }`}>
+            <span className="font-medium">
+              {confirmAction === "clear"
+                ? "Delete all logs and linked incidents? This cannot be undone."
+                : "Archive old logs and purge them from the database now?"}
+            </span>
+            <button
+              onClick={confirmAction === "clear" ? runClearAll : runArchive}
+              disabled={maintenanceBusy}
+              className={`px-3 py-1 rounded font-semibold disabled:opacity-50 ${
+                confirmAction === "clear"
+                  ? "bg-red-700 text-white hover:bg-red-600"
+                  : "bg-yellow-700 text-white hover:bg-yellow-600"
+              }`}
+            >
+              {maintenanceBusy ? "Working..." : "Confirm"}
+            </button>
+            <button
+              onClick={() => setConfirmAction(null)}
+              className="text-slate-300 hover:text-white"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         {/* Table */}
         <div className="flex-1 overflow-auto bg-slate-900/60 border border-slate-800 rounded-2xl">

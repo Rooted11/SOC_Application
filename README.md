@@ -22,11 +22,11 @@ All IP addresses and infrastructure shown are part of a simulated lab environmen
 ``
 
 ```
-  Windows Host (192.168.56.1)              Ubuntu VM (192.168.56.102)
+  Windows Host (<VM_HOST_IP>)              Ubuntu VM (<SOC_UBUNTU_IP>)
   ===========================              ==========================
                                            Docker Compose
   Browser ──────────────────────────────►  ┌──────────────────────┐
-  http://192.168.56.102:3000               │  frontend (Vite/React)│ :3000
+  http://<SOC_UBUNTU_IP>:3000               │  frontend (Vite/React)│ :3000
                                            │         │             │
   soc_manage.py ────────────────────────►  │  backend (FastAPI)    │ :8000
   send_local_logs.py ───────────────────►  │    ├── anomaly_detection (Isolation Forest ML)
@@ -90,7 +90,7 @@ All IP addresses and infrastructure shown are part of a simulated lab environmen
 
 ### Prerequisites
 - Ubuntu 22.04+ VM with Docker and Docker Compose
-- VirtualBox Host-Only adapter (192.168.56.x network)
+- VirtualBox Host-Only adapter (<LAB_SUBNET>.x network)
 - Python 3.10+
 
 ### 1. Clone and configure
@@ -128,7 +128,7 @@ sudo systemctl enable soc-agent
 
 ### 4. Login
 
-Open http://192.168.56.102:3000 in your browser.
+Open http://<SOC_UBUNTU_IP>:3000 in your browser.
 
 | Field    | Value |
 |----------|-------|
@@ -138,10 +138,10 @@ Open http://192.168.56.102:3000 in your browser.
 ## Connecting from Windows
 
 ### Frontend (browser)
-Navigate to: `http://192.168.56.102:3000`
+Navigate to: `http://<SOC_UBUNTU_IP>:3000`
 
 ### API access (scripts)
-All scripts default to `http://192.168.56.102:8000`.
+All scripts default to `http://<SOC_UBUNTU_IP>:8000`.
 
 ### Management tool (no SSH required)
 ```powershell
@@ -180,7 +180,7 @@ and sends to the backend every 10 seconds.
 
 ### From any machine (curl)
 ```bash
-curl -X POST http://192.168.56.102:8000/api/logs/ingest \
+curl -X POST http://<SOC_UBUNTU_IP>:8000/api/logs/ingest \
   -H "Content-Type: application/json" \
   -H "X-Agent-Token: lab-ingest-token" \
   -d '{
@@ -200,7 +200,7 @@ curl -X POST http://192.168.56.102:8000/api/logs/ingest \
 ### From Python
 ```python
 import json, urllib.request
-url = "http://192.168.56.102:8000/api/logs/ingest"
+url = "http://<SOC_UBUNTU_IP>:8000/api/logs/ingest"
 logs = [{"source":"test","timestamp":"2026-03-28T12:00:00Z",
          "log_level":"error","message":"Test alert","ip_src":"10.0.0.1",
          "event_type":"auth_failure","user":"admin"}]
@@ -322,14 +322,14 @@ logger.error("Failed to connect: %s", exc)
 ## Troubleshooting
 
 ### "Authentication bootstrap failed"
-- Check that the backend is running: `curl http://192.168.56.102:8000/api/auth/status`
+- Check that the backend is running: `curl http://<SOC_UBUNTU_IP>:8000/api/auth/status`
 - Check `VITE_API_BASE_URL` in `frontend/.env` matches your VM IP
 
 ### Logs not appearing
 1. Check agent: `sudo journalctl -u soc-agent -f`
 2. Check worker: `docker-compose logs -f worker`
-3. Check Redis queue: `curl http://192.168.56.102:8000/api/system/health`
-4. Manual test: `curl -X POST http://192.168.56.102:8000/api/logs/ingest -H "X-Agent-Token: lab-ingest-token" -H "Content-Type: application/json" -d '{"logs":[{"source":"test","message":"test","log_level":"info","event_type":"syslog"}]}'`
+3. Check Redis queue: `curl http://<SOC_UBUNTU_IP>:8000/api/system/health`
+4. Manual test: `curl -X POST http://<SOC_UBUNTU_IP>:8000/api/logs/ingest -H "X-Agent-Token: lab-ingest-token" -H "Content-Type: application/json" -d '{"logs":[{"source":"test","message":"test","log_level":"info","event_type":"syslog"}]}'`
 
 ### Incidents not being created
 - Incidents only create when: anomaly detected (risk > threshold) OR detection rule matches OR IOC correlation hit
@@ -350,7 +350,7 @@ docker-compose restart worker
 
 ### Cannot reach VM from Windows
 - Check VirtualBox Host-Only adapter is enabled
-- Ping test: `ping 192.168.56.102`
+- Ping test: `ping <SOC_UBUNTU_IP>`
 - Check VM IP: `ip addr show` on the VM
 
 ### Docker containers not starting
