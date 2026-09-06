@@ -241,6 +241,18 @@ class UserRole(Base):
     __table_args__ = (UniqueConstraint("user_id", "role_id", name="uq_user_role"),)
 
 
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    id         = Column(Integer, primary_key=True, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash = Column(String(64), unique=True, index=True)
+    expires_at = Column(DateTime)
+    used_at    = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
 # â”€â”€ Configurable detections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class DetectionRule(Base):
@@ -459,7 +471,7 @@ ROLE_PRESETS = {
 }
 
 
-def _hash_password(password: str, salt: Optional[str] = None) -> tuple[str, str]:
+def hash_password(password: str, salt: Optional[str] = None) -> tuple[str, str]:
     salt_bytes = bytes.fromhex(salt) if salt else secrets.token_bytes(16)
     derived = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt_bytes, 120000)
     return salt_bytes.hex(), derived.hex()
@@ -481,7 +493,7 @@ def _seed_roles_and_admin(db):
 
     # Seed super admin user if none exists
     if db.query(User).count() == 0:
-        salt, pwd_hash = _hash_password(settings.auth_password)
+        salt, pwd_hash = hash_password(settings.auth_password)
         user = User(
             username=settings.auth_username,
             full_name="SOC Super Admin",

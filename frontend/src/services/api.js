@@ -100,6 +100,20 @@ export const api = {
 
   getCurrentUser: () => request("/api/auth/me"),
 
+  forgotPassword: (username) =>
+    request("/api/auth/forgot-password", {
+      method: "POST",
+      auth: false,
+      body: JSON.stringify({ username }),
+    }),
+
+  resetPassword: (token, newPassword) =>
+    request("/api/auth/reset-password", {
+      method: "POST",
+      auth: false,
+      body: JSON.stringify({ token, new_password: newPassword }),
+    }),
+
   getOverview: () => request("/api/overview"),
 
   getIncidents: (params = {}) => {

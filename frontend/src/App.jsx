@@ -7,6 +7,7 @@ import AIAdvisor from "./components/AIAdvisor";
 import LiveFeed from "./components/LiveFeed";
 import AssetInventory from "./components/AssetInventory";
 import LoginScreen from "./components/LoginScreen";
+import ResetPasswordScreen from "./components/ResetPasswordScreen";
 import UsersRoles from "./components/UsersRoles";
 import Detections from "./components/Detections";
 import PlaybooksPage from "./components/PlaybooksPage";
@@ -224,7 +225,17 @@ function FullscreenState({ title, message, actionLabel, onAction }) {
 
 /* ── Main App ──────────────────────────────────────────────────────────── */
 
+function useResetPasswordToken() {
+  const [resetToken] = useState(() => {
+    if (typeof window === "undefined") return null;
+    if (window.location.pathname !== "/reset-password") return null;
+    return new URLSearchParams(window.location.search).get("token");
+  });
+  return resetToken;
+}
+
 export default function App() {
+  const resetToken = useResetPasswordToken();
   const [page, _setPage] = useState(() => {
     const hash = (typeof window !== "undefined" && window.location.hash || "").replace(/^#/, "");
     const valid = NAV_ITEMS.find((i) => i.id === hash);
@@ -465,6 +476,9 @@ export default function App() {
     showAlert("Signed out.", "info");
   }
 
+  if (resetToken) {
+    return <ResetPasswordScreen token={resetToken} />;
+  }
   if (booting) {
     return <FullscreenState title="Preparing secure operator session" message="Checking runtime security mode and backend connectivity." />;
   }

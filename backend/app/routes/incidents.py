@@ -18,6 +18,7 @@ from pydantic import BaseModel, validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ..services.authz import require_permissions
 from ..services.database import (
     get_db, Incident, PlaybookAction, ThreatIndicator, Asset, Log,
     SeverityEnum, StatusEnum
@@ -348,7 +349,10 @@ def update_incident(
     return _inc_to_dict(inc)
 
 
-@router.post("/api/incidents/{incident_id}/respond")
+@router.post(
+    "/api/incidents/{incident_id}/respond",
+    dependencies=[Depends(require_permissions(["playbooks:run", "playbooks:write"]))],
+)
 def trigger_playbook(
     incident_id: int,
     payload: PlaybookRequest,
@@ -426,7 +430,10 @@ def refresh_threat_feed(db: Session = Depends(get_db)):
     }
 
 
-@router.delete("/api/threat-intel")
+@router.delete(
+    "/api/threat-intel",
+    dependencies=[Depends(require_permissions(["config:*", "admin:roles"]))],
+)
 def purge_threat_intel(
     payload: ThreatIntelPurgeRequest,
     db: Session = Depends(get_db),

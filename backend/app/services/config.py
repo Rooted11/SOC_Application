@@ -55,6 +55,14 @@ class Settings:
     ingest_token: str
     ai_auto_enabled: bool
     ai_model: str
+    smtp_host: str
+    smtp_port: int
+    smtp_username: str
+    smtp_password: str
+    smtp_from: str
+    smtp_use_tls: bool
+    frontend_url: str
+    password_reset_ttl_minutes: int
 
     @property
     def is_production(self) -> bool:
@@ -140,6 +148,14 @@ def load_settings() -> Settings:
             default=False,
         ),
         ai_model=os.getenv("ANTHROPIC_MODEL") or os.getenv("CLAUDE_MODEL") or "claude-3-haiku",
+        smtp_host=os.getenv("SMTP_HOST", ""),
+        smtp_port=int(os.getenv("SMTP_PORT", "587")),
+        smtp_username=os.getenv("SMTP_USERNAME", ""),
+        smtp_password=os.getenv("SMTP_PASSWORD", ""),
+        smtp_from=os.getenv("SMTP_FROM", os.getenv("SMTP_USERNAME", "")),
+        smtp_use_tls=_parse_bool(os.getenv("SMTP_USE_TLS"), default=True),
+        frontend_url=os.getenv("FRONTEND_URL", "http://localhost:3000"),
+        password_reset_ttl_minutes=int(os.getenv("PASSWORD_RESET_TTL_MINUTES", "30")),
     )
 
 
@@ -174,6 +190,8 @@ def validate_settings() -> None:
         problems.append("AUTH_TOTP_SECRET must be replaced with a real value in production.")
     if os.getenv("POSTGRES_PASSWORD", "").startswith(placeholder_prefix):
         problems.append("POSTGRES_PASSWORD must be replaced with a real value in production.")
+    if settings.smtp_host and not (settings.smtp_username and settings.smtp_password):
+        problems.append("SMTP_USERNAME and SMTP_PASSWORD must be set when SMTP_HOST is configured.")
 
     if problems:
         formatted = "\n".join(f"- {problem}" for problem in problems)

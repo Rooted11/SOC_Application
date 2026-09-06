@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import hashlib
-import secrets
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from ..services.database import get_db, User, Role, UserRole
+from ..services.database import get_db, hash_password, User, Role, UserRole
 from ..services.authz import require_permissions
 
 router = APIRouter(prefix="/api/admin/users", tags=["admin:users"])
@@ -28,13 +26,6 @@ class UserUpdate(BaseModel):
     email: str | None = None
     roles: List[str] | None = None
     is_active: bool | None = None
-
-
-def _hash_password(password: str) -> tuple[str, str]:
-    salt = secrets.token_bytes(16)
-    salt_hex = salt.hex()
-    derived = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 120000)
-    return salt_hex, derived.hex()
 
 
 @router.get("", dependencies=[Depends(require_permissions(["admin:users"]))])
@@ -59,7 +50,7 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.username == payload.username).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
-    salt, pwd_hash = _hash_password(payload.password)
+    salt, pwd_hash = hash_password(payload.password)
     user = User(
         username=payload.username,
         full_name=payload.full_name,
@@ -84,7 +75,7 @@ def update_user(user_id: int, payload: UserUpdate, db: Session = Depends(get_db)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     if payload.password:
-        user.password_salt, user.password_hash = _hash_password(payload.password)
+        user.password_salt, user.password_hash = hash_password(payload.password)
     if payload.full_name is not None:
         user.full_name = payload.full_name
     if payload.email is not None:

@@ -1,13 +1,32 @@
 import { useState } from "react";
+import { api } from "../services/api";
 
 export default function LoginScreen({ busy, error, mfaEnabled, onSubmit }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [otpCode, setOtpCode] = useState("");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotUsername, setForgotUsername] = useState("");
+  const [forgotBusy, setForgotBusy] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState(null);
 
   async function handleSubmit(event) {
     event.preventDefault();
     await onSubmit({ username, password, otpCode });
+  }
+
+  async function handleForgotSubmit(event) {
+    event.preventDefault();
+    setForgotBusy(true);
+    setForgotMessage(null);
+    try {
+      const result = await api.forgotPassword(forgotUsername);
+      setForgotMessage(result.message || "If that account exists, a reset link has been sent.");
+    } catch (submitError) {
+      setForgotMessage(submitError.message);
+    } finally {
+      setForgotBusy(false);
+    }
   }
 
   return (
@@ -57,80 +76,146 @@ export default function LoginScreen({ busy, error, mfaEnabled, onSubmit }) {
           </section>
 
           <section className="rounded-[28px] border border-slate-800 bg-slate-950/80 p-8 shadow-[0_30px_80px_rgba(2,6,23,0.55)] backdrop-blur">
-            <div className="text-sm uppercase tracking-[0.3em] text-slate-500">
-              Operator Sign In
-            </div>
-            <h2 className="mt-3 text-2xl font-semibold text-white">
-              Ataraxia access
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-400">
-              Use the credentials configured on the backend via environment variables.
-              {mfaEnabled ? " This environment also requires a one-time code." : ""}
-            </p>
-
-            <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
-              <label className="block">
-                <span className="mb-2 block text-xs uppercase tracking-[0.25em] text-slate-500">
-                  Username
-                </span>
-                <input
-                  type="text"
-                  autoComplete="username"
-                  value={username}
-                  onChange={(event) => setUsername(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20"
-                  placeholder="soc_operator"
-                  required
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-xs uppercase tracking-[0.25em] text-slate-500">
-                  Password
-                </span>
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20"
-                  placeholder="Enter operator password"
-                  required
-                />
-              </label>
-
-              {mfaEnabled && (
-                <label className="block">
-                  <span className="mb-2 block text-xs uppercase tracking-[0.25em] text-slate-500">
-                    One-Time Code
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    value={otpCode}
-                    onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                    className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-sm tracking-[0.3em] text-white outline-none transition focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20"
-                    placeholder="123456"
-                    required
-                  />
-                </label>
-              )}
-
-              {error && (
-                <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                  {error}
+            {showForgotPassword ? (
+              <>
+                <div className="text-sm uppercase tracking-[0.3em] text-slate-500">
+                  Reset Password
                 </div>
-              )}
+                <h2 className="mt-3 text-2xl font-semibold text-white">
+                  Forgot your password?
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Enter your username and, if an email is on file, we'll send a reset link.
+                </p>
 
-              <button
-                type="submit"
-                disabled={busy}
-                className="inline-flex w-full items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {busy ? "Signing in..." : "Sign In"}
-              </button>
-            </form>
+                <form className="mt-8 space-y-5" onSubmit={handleForgotSubmit}>
+                  <label className="block">
+                    <span className="mb-2 block text-xs uppercase tracking-[0.25em] text-slate-500">
+                      Username
+                    </span>
+                    <input
+                      type="text"
+                      autoComplete="username"
+                      value={forgotUsername}
+                      onChange={(event) => setForgotUsername(event.target.value)}
+                      className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20"
+                      placeholder="soc_operator"
+                      required
+                    />
+                  </label>
+
+                  {forgotMessage && (
+                    <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+                      {forgotMessage}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={forgotBusy}
+                    className="inline-flex w-full items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {forgotBusy ? "Sending..." : "Send reset link"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPassword(false);
+                      setForgotMessage(null);
+                    }}
+                    className="w-full text-center text-xs uppercase tracking-[0.25em] text-slate-500 transition hover:text-cyan-400"
+                  >
+                    Back to sign in
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <div className="text-sm uppercase tracking-[0.3em] text-slate-500">
+                  Operator Sign In
+                </div>
+                <h2 className="mt-3 text-2xl font-semibold text-white">
+                  Ataraxia access
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Use the credentials configured on the backend via environment variables.
+                  {mfaEnabled ? " This environment also requires a one-time code." : ""}
+                </p>
+
+                <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+                  <label className="block">
+                    <span className="mb-2 block text-xs uppercase tracking-[0.25em] text-slate-500">
+                      Username
+                    </span>
+                    <input
+                      type="text"
+                      autoComplete="username"
+                      value={username}
+                      onChange={(event) => setUsername(event.target.value)}
+                      className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20"
+                      placeholder="soc_operator"
+                      required
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-xs uppercase tracking-[0.25em] text-slate-500">
+                      Password
+                    </span>
+                    <input
+                      type="password"
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20"
+                      placeholder="Enter operator password"
+                      required
+                    />
+                  </label>
+
+                  {mfaEnabled && (
+                    <label className="block">
+                      <span className="mb-2 block text-xs uppercase tracking-[0.25em] text-slate-500">
+                        One-Time Code
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        value={otpCode}
+                        onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                        className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-sm tracking-[0.3em] text-white outline-none transition focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20"
+                        placeholder="123456"
+                        required
+                      />
+                    </label>
+                  )}
+
+                  {error && (
+                    <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="inline-flex w-full items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {busy ? "Signing in..." : "Sign In"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="w-full text-center text-xs uppercase tracking-[0.25em] text-slate-500 transition hover:text-cyan-400"
+                  >
+                    Forgot password?
+                  </button>
+                </form>
+              </>
+            )}
           </section>
         </div>
       </div>
